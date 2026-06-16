@@ -1,27 +1,31 @@
 package com.maxrave.simpmusic.ai
 
 /**
- * AI Service for local inference using Qwen 3 1.7B model
+ * AI Service for local inference using GGUF models
  * Handles model loading, inference, and resource management
  * 
- * NOTE: Llamatik library integration is pending due to dependency resolution issues.
- * The infrastructure is in place for easy integration once the library is available.
+ * NOTE: Local LLM library integration is pending due to dependency resolution issues.
+ * The infrastructure is in place for easy integration once a compatible library is available.
  * 
- * To implement with Llamatik:
- * 1. Ensure Llamatik dependency is properly resolved
- * 2. Replace placeholder methods with actual LlamaBridge calls
+ * Attempted libraries:
+ * - Llamatik: Dependency resolution issues with "Unresolved reference 'LlamaBridge'"
+ * - llmedge: Manifest merger errors
+ * 
+ * To implement with a working library:
+ * 1. Add compatible library dependency
+ * 2. Replace placeholder methods with actual library calls
  * 3. See AIFeatureIdeas.md for implementation details
  */
 class AIService {
     private var isModelLoaded = false
     
     /**
-     * Load the Qwen 3 1.7B model
+     * Load a GGUF model
      * @param modelPath Path to the GGUF model file
      * @return true if model loaded successfully
      */
     suspend fun loadModel(modelPath: String): Boolean {
-        // TODO: Implement actual model loading using Llamatik once dependency is resolved
+        // TODO: Implement actual model loading using a compatible library
         // For now, simulate successful load for testing infrastructure
         isModelLoaded = true
         return true
@@ -33,7 +37,7 @@ class AIService {
      * @param params Optional generation parameters
      * @return Generated text
      */
-    fun generate(
+    suspend fun generate(
         prompt: String,
         params: Map<String, Any>? = null,
     ): String {
@@ -41,9 +45,9 @@ class AIService {
             throw IllegalStateException("Model not loaded")
         }
         
-        // TODO: Implement actual generation using Llamatik once dependency is resolved
+        // TODO: Implement actual generation using a compatible library
         // For now, return a placeholder response
-        return "AI generation not yet implemented. Llamatik library integration pending."
+        return "AI generation not yet implemented. Local LLM library integration pending due to dependency resolution issues."
     }
     
     /**
@@ -55,7 +59,7 @@ class AIService {
      * Unload model and free resources
      */
     fun unloadModel() {
-        // TODO: Implement actual unloading using Llamatik once dependency is resolved
+        // TODO: Implement actual unloading
         isModelLoaded = false
     }
     
@@ -65,9 +69,9 @@ class AIService {
     fun getModelInfo(): Map<String, Any> {
         return mapOf(
             "isLoaded" to isModelLoaded,
-            "modelName" to "Qwen 3 1.7B",
+            "library" to "pending",
+            "backend" to "pending",
             "format" to "GGUF",
-            "contextSize" to 4096,
         )
     }
 }
