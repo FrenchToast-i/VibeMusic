@@ -37,6 +37,7 @@ import com.maxrave.domain.utils.toArrayListTrack
 import com.maxrave.domain.utils.toSongEntity
 import com.maxrave.domain.utils.toTrack
 import com.maxrave.logger.Logger
+import com.maxrave.simpmusic.expect.getAIRecommendation
 import com.maxrave.simpmusic.pagination.PagingActions
 import com.maxrave.simpmusic.ui.theme.md_theme_dark_background
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
@@ -962,11 +963,15 @@ class LocalPlaylistViewModel(
                     
                     makeToast("Generating AI recommendation...")
                     
-                    // Call AI service (placeholder - actual implementation when AI service is ready)
-                    // TODO: Integrate with AIService.generate() when the AI model is ready
-                    // For now, show a random song from the playlist as a recommendation
-                    val randomSong = playlistSongs.random()
-                    makeToast("Recommended: ${randomSong.title}")
+                    // Try to use AI service if available
+                    try {
+                        val recommendation = getAIRecommendation(prompt)
+                        makeToast("Recommended: $recommendation")
+                    } catch (e: Exception) {
+                        // Fallback to random recommendation on error
+                        val randomSong = playlistSongs.random()
+                        makeToast("AI error: ${e.message}. Random recommendation: ${randomSong.title}")
+                    }
                 }
             }
         }

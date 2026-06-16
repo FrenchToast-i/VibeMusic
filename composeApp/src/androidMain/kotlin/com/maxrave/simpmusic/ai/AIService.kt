@@ -4,11 +4,11 @@ package com.maxrave.simpmusic.ai
  * AI Service for local inference using Qwen 3 1.7B model
  * Handles model loading, inference, and resource management
  * 
- * NOTE: This is a placeholder implementation. The actual AI integration
- * using llama.cpp/Llamatik needs to be implemented later.
+ * NOTE: Llamatik library integration is pending due to dependency resolution issues.
+ * The infrastructure is in place for easy integration once the library is available.
  * 
- * To implement:
- * 1. Add Llamatik dependency: implementation("com.llamatik:library:1.7.0")
+ * To implement with Llamatik:
+ * 1. Ensure Llamatik dependency is properly resolved
  * 2. Replace placeholder methods with actual LlamaBridge calls
  * 3. See AIFeatureIdeas.md for implementation details
  */
@@ -21,8 +21,8 @@ class AIService {
      * @return true if model loaded successfully
      */
     suspend fun loadModel(modelPath: String): Boolean {
-        // TODO: Implement actual model loading using LlamaBridge.initGenerateModel()
-        // For now, just mark as loaded to allow testing infrastructure
+        // TODO: Implement actual model loading using Llamatik once dependency is resolved
+        // For now, simulate successful load for testing infrastructure
         isModelLoaded = true
         return true
     }
@@ -41,9 +41,9 @@ class AIService {
             throw IllegalStateException("Model not loaded")
         }
         
-        // TODO: Implement actual generation using LlamaBridge.generate()
+        // TODO: Implement actual generation using Llamatik once dependency is resolved
         // For now, return a placeholder response
-        return "AI generation not yet implemented. This is a placeholder response."
+        return "AI generation not yet implemented. Llamatik library integration pending."
     }
     
     /**
@@ -55,7 +55,7 @@ class AIService {
      * Unload model and free resources
      */
     fun unloadModel() {
-        // TODO: Implement actual unloading using LlamaBridge.shutdown()
+        // TODO: Implement actual unloading using Llamatik once dependency is resolved
         isModelLoaded = false
     }
     
