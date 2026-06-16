@@ -13,39 +13,78 @@ on:
         type: string
         default: 'Automated release build'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build Release APK
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
-      - name: Set up JDK 17
+        with:
+          submodules: 'recursive'
+
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          
+          java-version: '21'
+          distribution: 'microsoft'
+          cache: 'gradle'
+
+      - name: Create local.properties
+        run: |
+          echo 'SENTRY_DSN=' > ./local.properties
+          echo 'SENTRY_AUTH_TOKEN=' >> ./local.properties
+
+      - name: Update build product flavor
+        run: |
+          echo "" >> ./gradle.properties
+          echo "isFullBuild=false" >> ./gradle.properties
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-        
+
+      - name: Generate aboutLibraries.json
+        run: ./gradlew exportLibraryDefinitions
+
       - name: Build Release APK
-        run: ./gradlew :androidApp:assembleRelease
+        run: ./gradlew androidApp:assembleRelease
+
+      - name: Check build-tools version
+        id: build-tools
+        run: |
+          BUILD_TOOL_VERSION=$(ls /usr/local/lib/android/sdk/build-tools/ | tail -n 1)
+          echo "BUILD_TOOL_VERSION=$BUILD_TOOL_VERSION" >> $GITHUB_ENV
+          echo "Last build tool version is: $BUILD_TOOL_VERSION"
+
+      - name: Sign APK
+        uses: kevin-david/zipalign-sign-android-release@v2
+        id: sign_app
+        with:
+          releaseDirectory: androidApp/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+          zipAlign: true
         env:
-          ANDROID_HOME: /usr/lib/android-sdk
-          ANDROID_SDK_ROOT: /usr/lib/android-sdk
-          
-      - name: Get APK path
-        id: apk-path
-        run: echo "path=$(find androidApp/build/outputs/apk/release -name '*.apk' | head -n 1)" >> $GITHUB_OUTPUT
-        
-      - name: Rename APK
-        run: mv ${{ steps.apk-path.outputs.path }} androidApp/build/outputs/apk/release/VibeMusic-${{ github.event.inputs.version }}.apk
-        
+          BUILD_TOOLS_VERSION: ${{ env.BUILD_TOOL_VERSION }}
+
+      - name: Rename signed APK
+        run: |
+          SIGNED_APK=$(find androidApp/build/outputs/apk/release -name '*-signed.apk' | head -n 1)
+          if [ -n "$SIGNED_APK" ]; then
+            mv "$SIGNED_APK" androidApp/build/outputs/apk/release/VibeMusic-${{ github.event.inputs.version }}.apk
+          else
+            APK=$(find androidApp/build/outputs/apk/release -name '*.apk' ! -name '*-unsigned*' | head -n 1)
+            mv "$APK" androidApp/build/outputs/apk/release/VibeMusic-${{ github.event.inputs.version }}.apk
+          fi
+
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.event.inputs.version }}
           name: VibeMusic v${{ github.event.inputs.version }}
