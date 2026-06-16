@@ -30,6 +30,7 @@ import com.maxrave.simpmusic.viewModel.PlaylistUIState.Error
 import com.maxrave.simpmusic.viewModel.PlaylistUIState.Loading
 import com.maxrave.simpmusic.viewModel.PlaylistUIState.Success
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
+import com.maxrave.simpmusic.extension.smartShuffle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -81,6 +82,12 @@ class PlaylistViewModel(
 
     private var _tracks = MutableStateFlow<List<Track>>(emptyList())
     val tracks: StateFlow<List<Track>> = _tracks
+
+    private var _enjoyedSongs = MutableStateFlow<Set<String>>(emptySet())
+    val enjoyedSongs: StateFlow<Set<String>> = _enjoyedSongs
+
+    private var _dislikedSongs = MutableStateFlow<Set<String>>(emptySet())
+    val dislikedSongs: StateFlow<Set<String>> = _dislikedSongs
 
     private var _tracksListState = MutableStateFlow<ListState>(ListState.IDLE)
     val tracksListState: StateFlow<ListState> = _tracksListState
@@ -490,45 +497,77 @@ class PlaylistViewModel(
             }
 
             PlaylistUIEvent.Shuffle -> {
-                val shuffleEndpoint = data.shuffleEndpoint
-                if (shuffleEndpoint == null) {
+                val loadedList = tracks.value
+                if (loadedList.isEmpty()) {
                     makeToast(
-                        getString(Res.string.shuffle_not_available),
+                        getString(Res.string.playlist_is_empty),
                     )
                     return
-                } else {
-                    viewModelScope.launch {
-                        songRepository.getRadioFromEndpoint(shuffleEndpoint).collectLatest { res ->
-                            val result = res.data
-                            when (res) {
-                                is Resource.Success if (result != null) -> {
-                                    Logger.d(tag, "Shuffle data: ${result.first.size}")
-                                    setQueueData(
-                                        QueueData.Data(
-                                            listTracks = result.first.toCollection(arrayListOf<Track>()),
-                                            firstPlayedTrack = result.first.firstOrNull() ?: return@collectLatest,
-                                            playlistId = shuffleEndpoint.playlistId,
-                                            playlistName = "\"${data.title}\" ${getString(Res.string.shuffle)}",
-                                            playlistType = PlaylistType.RADIO,
-                                            continuation = result.second,
-                                        ),
-                                    )
-                                    loadMediaItem(
-                                        result.first.firstOrNull() ?: return@collectLatest,
-                                        Config.RADIO_CLICK,
-                                        0,
-                                    )
-                                }
-
-                                else -> {
-                                    makeToast(
-                                        res.message ?: getString(Res.string.error),
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
+                val shuffleList = loadedList.toMutableList()
+                // Manual Fisher-Yates shuffle
+                for (i in shuffleList.size - 1 downTo 1) {
+                    val j = (Math.random() * (i + 1)).toInt()
+                    val temp = shuffleList[i]
+                    shuffleList[i] = shuffleList[j]
+                    shuffleList[j] = temp
+                }
+                val randomIndex = shuffleList.indices.random()
+                setQueueData(
+                    QueueData.Data(
+                        listTracks = shuffleList.toCollection(arrayListOf<Track>()),
+                        firstPlayedTrack = shuffleList[randomIndex],
+                        playlistId = data.id,
+                        playlistName = "\"${data.title}\" ${getString(Res.string.shuffle)}",
+                        playlistType = PlaylistType.PLAYLIST,
+                        continuation = continuation.value,
+                    ),
+                )
+                loadMediaItem(
+                    shuffleList[randomIndex],
+                    Config.PLAYLIST_CLICK,
+                    randomIndex,
+                )
+            }
+
+            PlaylistUIEvent.SmartShuffle -> {
+                val loadedList = tracks.value
+                if (loadedList.isEmpty()) {
+                    makeToast(
+                        getString(Res.string.playlist_is_empty),
+                    )
+                    return
+                }
+                val enjoyed = enjoyedSongs.value
+                val disliked = dislikedSongs.value
+                val smartShuffleList = loadedList.smartShuffle(
+                    getArtist = { it.artists?.firstOrNull()?.name },
+                    getPreferenceScore = { track ->
+                        when (track.videoId) {
+                            in enjoyed -> 1
+                            in disliked -> -1
+                            else -> 0
+                        }
+                    },
+                    getDuration = { (it.durationSeconds ?: 0).toLong() },
+                    getAlbum = { it.album?.name }
+                )
+                val randomIndex = smartShuffleList.indices.random()
+                setQueueData(
+                    QueueData.Data(
+                        listTracks = smartShuffleList.toCollection(arrayListOf<Track>()),
+                        firstPlayedTrack = smartShuffleList[randomIndex],
+                        playlistId = data.id,
+                        playlistName = "\"${data.title}\" Smart ${getString(Res.string.shuffle)}",
+                        playlistType = PlaylistType.PLAYLIST,
+                        continuation = continuation.value,
+                    ),
+                )
+                loadMediaItem(
+                    smartShuffleList[randomIndex],
+                    Config.PLAYLIST_CLICK,
+                    randomIndex,
+                )
             }
 
             PlaylistUIEvent.StartRadio -> {
@@ -676,6 +715,28 @@ class PlaylistViewModel(
         }
     }
 
+    fun toggleEnjoy(videoId: String) {
+        _enjoyedSongs.update { current ->
+            if (videoId in current) {
+                current - videoId
+            } else {
+                current + videoId
+            }
+        }
+        _dislikedSongs.update { it - videoId }
+    }
+
+    fun toggleDislike(videoId: String) {
+        _dislikedSongs.update { current ->
+            if (videoId in current) {
+                current - videoId
+            } else {
+                current + videoId
+            }
+        }
+        _enjoyedSongs.update { it - videoId }
+    }
+
     override fun onCleared() {
         super.onCleared()
         collectDownloadedJob?.cancel()
@@ -706,6 +767,8 @@ sealed class PlaylistUIEvent {
     data object PlayAll : PlaylistUIEvent()
 
     data object Shuffle : PlaylistUIEvent()
+
+    data object SmartShuffle : PlaylistUIEvent()
 
     data object StartRadio : PlaylistUIEvent()
 

@@ -39,6 +39,7 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlin.math.abs
 import kotlin.time.ExperimentalTime
 
 fun String?.removeDuplicateWords(): String {
@@ -241,3 +242,167 @@ fun SponsorBlockType.displayString(): String =
         SponsorBlockType.SELF_PROMOTION -> stringResource(Res.string.self_promotion)
         SponsorBlockType.SPONSOR -> stringResource(Res.string.sponsor)
     }
+
+fun <T> List<T>.smartShuffle(
+    getArtist: (T) -> String?,
+    getPreferenceScore: (T) -> Int = { _ -> 0 },
+    getDuration: (T) -> Long = { _ -> 0 },
+    getAlbum: (T) -> String? = { _ -> null },
+): List<T> {
+    if (this.size <= 2) {
+        val result = this.toMutableList()
+        // Manual Fisher-Yates shuffle
+        for (i in result.size - 1 downTo 1) {
+            val j = (Math.random() * (i + 1)).toInt()
+            val temp = result[i]
+            result[i] = result[j]
+            result[j] = temp
+        }
+        return result
+    }
+
+    // Generate multiple random sequences and score them (Spotify-style "Fewer Repeats")
+    val sequences = mutableListOf<List<T>>()
+    val numSequences = minOf(5, this.size)
+
+    repeat(numSequences) {
+        val shuffled = this.toMutableList()
+        val artistBuckets = shuffled.groupBy { getArtist(it) ?: "Unknown" }
+
+        val result = mutableListOf<T>()
+        val remaining = artistBuckets.values.map { it.toMutableList() }.toMutableList()
+
+        while (remaining.isNotEmpty()) {
+            val nonEmptyBuckets = remaining.filter { it.isNotEmpty() }
+            if (nonEmptyBuckets.isEmpty()) break
+
+            val lastArtist = result.lastOrNull()?.let { getArtist(it) }
+            val lastAlbum = result.lastOrNull()?.let { getAlbum(it) }
+            val lastDuration = result.lastOrNull()?.let { getDuration(it) }
+
+            val availableBuckets = if (lastArtist != null) {
+                nonEmptyBuckets.filter { bucket ->
+                    getArtist(bucket.first()) != lastArtist || bucket.size > nonEmptyBuckets.size / 2
+                }
+            } else {
+                nonEmptyBuckets
+            }
+
+            // Score each track in available buckets
+            val scoredTracks = mutableListOf<Pair<T, Double>>()
+            for (bucket in availableBuckets) {
+                for (track in bucket) {
+                    var score = 0.0
+
+                    // Preference score (balanced: +1 for enjoyed, -1 for disliked)
+                    val prefScore = getPreferenceScore(track)
+                    score += prefScore * 0.5
+
+                    // Avoid same album consecutively
+                    if (lastAlbum != null && getAlbum(track) == lastAlbum) {
+                        score -= 0.3
+                    }
+
+                    // Duration variety (avoid clustering similar lengths)
+                    if (lastDuration != null && lastDuration > 0) {
+                        val durationDiff = abs(getDuration(track) - lastDuration).toDouble()
+                        val durationRatio = durationDiff / lastDuration
+                        // Prefer songs with different durations (within reasonable range)
+                        if (durationRatio > 0.2 && durationRatio < 0.8) {
+                            score += 0.2
+                        } else if (durationRatio < 0.1) {
+                            score -= 0.1
+                        }
+                    }
+
+                    // Slight randomness to prevent deterministic ordering
+                    score += Math.random() * 0.1
+
+                    scoredTracks.add(Pair(track, score))
+                }
+            }
+
+            // Select track with highest score (weighted random)
+            val maxScore = scoredTracks.maxOfOrNull { it.second } ?: 0.0
+            val minScore = scoredTracks.minOfOrNull { it.second } ?: 0.0
+
+            val selectedTrack = if (maxScore == minScore) {
+                scoredTracks.random().first
+            } else {
+                // Weighted random selection based on scores
+                val normalizedScores = scoredTracks.map { (track, score) ->
+                    val normalized = if (maxScore - minScore > 0) {
+                        (score - minScore) / (maxScore - minScore)
+                    } else {
+                        0.5
+                    }
+                    // Add bias towards higher scores but keep randomness
+                    val weight = 1.0 + normalized * 2.0
+                    Triple(track, score, weight)
+                }
+                val totalWeight = normalizedScores.sumOf { it.third }
+                var randomWeight = Math.random() * totalWeight
+                var selected: T? = null
+                for ((track, _, weight) in normalizedScores) {
+                    randomWeight -= weight
+                    if (randomWeight <= 0) {
+                        selected = track
+                        break
+                    }
+                }
+                selected ?: normalizedScores.last().first
+            }
+
+            // Remove selected track from its bucket
+            val bucketToRemove = remaining.find { bucket -> bucket.contains(selectedTrack) }
+            bucketToRemove?.remove(selectedTrack)
+            if (bucketToRemove?.isEmpty() == true) {
+                remaining.remove(bucketToRemove)
+            }
+
+            result.add(selectedTrack)
+        }
+
+        sequences.add(result)
+    }
+
+    // Score sequences for "freshness" and variety
+    val scoredSequences = sequences.map { sequence ->
+        var score = 0.0
+
+        // Artist distribution score (lower is better)
+        val artistChanges = sequence.zipWithNext().count { (a, b) ->
+            getArtist(a) != getArtist(b)
+        }
+        score += artistChanges * 0.3
+
+        // Album distribution score
+        val albumChanges = sequence.zipWithNext().count { (a, b) ->
+            getAlbum(a) != getAlbum(b)
+        }
+        score += albumChanges * 0.2
+
+        // Duration variety score
+        val durationChanges = sequence.zipWithNext().count { (a, b) ->
+            val durA = getDuration(a)
+            val durB = getDuration(b)
+            if (durA > 0) {
+                val diff = abs(durB - durA).toDouble()
+                val ratio = diff / durA
+                ratio > 0.15 && ratio < 0.85
+            } else {
+                false
+            }
+        }
+        score += durationChanges * 0.15
+
+        // Preference alignment score
+        val prefScore = sequence.sumOf { getPreferenceScore(it) * 0.1 }
+        score += prefScore
+
+        Pair(sequence, score)
+    }
+
+    // Return the sequence with the highest score
+    return scoredSequences.maxByOrNull { it.second }?.first ?: sequences.first()
+}

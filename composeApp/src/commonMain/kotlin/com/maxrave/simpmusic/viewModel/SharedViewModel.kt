@@ -115,6 +115,8 @@ class SharedViewModel(
     private val lyricsCanvasRepository: LyricsCanvasRepository,
     private val cacheRepository: CacheRepository,
 ) : BaseViewModel() {
+    private val ENJOYED_SONGS = "enjoyed_songs"
+    private val DISLIKED_SONGS = "disliked_songs"
     var isFirstLiked: Boolean = false
     var isFirstMiniplayer: Boolean = false
     var isFirstSuggestions: Boolean = false
@@ -203,6 +205,12 @@ class SharedViewModel(
         )
     val nowPlayingScreenData: StateFlow<NowPlayingScreenData> = _nowPlayingScreenData
 
+    private var _enjoyedSongs = MutableStateFlow<Set<String>>(emptySet())
+    val enjoyedSongs: StateFlow<Set<String>> = _enjoyedSongs
+
+    private var _dislikedSongs = MutableStateFlow<Set<String>>(emptySet())
+    val dislikedSongs: StateFlow<Set<String>> = _dislikedSongs
+
     private var _likeStatus = MutableStateFlow<Boolean>(false)
     val likeStatus: StateFlow<Boolean> = _likeStatus
 
@@ -213,6 +221,19 @@ class SharedViewModel(
     init {
         viewModelScope.launch {
             log("SharedViewModel init")
+            // Load enjoyed and disliked songs from DataStore
+            val enjoyedSongsJson = dataStoreManager.getString(ENJOYED_SONGS).first()
+            val dislikedSongsJson = dataStoreManager.getString(DISLIKED_SONGS).first()
+            _enjoyedSongs.value = if (enjoyedSongsJson != null) {
+                enjoyedSongsJson.split(",").filter { it.isNotEmpty() }.toSet()
+            } else {
+                emptySet()
+            }
+            _dislikedSongs.value = if (dislikedSongsJson != null) {
+                dislikedSongsJson.split(",").filter { it.isNotEmpty() }.toSet()
+            } else {
+                emptySet()
+            }
             if (dataStoreManager.appVersion.first() != VersionManager.getVersionName()) {
                 dataStoreManager.resetOpenAppTime()
                 dataStoreManager.setAppVersion(
@@ -830,6 +851,56 @@ class SharedViewModel(
                 }
             }
         }
+
+    fun toggleEnjoy(videoId: String) {
+        _enjoyedSongs.update { current ->
+            if (videoId in current) {
+                val newSet = current - videoId
+                viewModelScope.launch {
+                    dataStoreManager.putString(ENJOYED_SONGS, newSet.joinToString(","))
+                }
+                newSet
+            } else {
+                val newSet = current + videoId
+                viewModelScope.launch {
+                    dataStoreManager.putString(ENJOYED_SONGS, newSet.joinToString(","))
+                }
+                newSet
+            }
+        }
+        _dislikedSongs.update { current ->
+            val newSet = current - videoId
+            viewModelScope.launch {
+                dataStoreManager.putString(DISLIKED_SONGS, newSet.joinToString(","))
+            }
+            newSet
+        }
+    }
+
+    fun toggleDislike(videoId: String) {
+        _dislikedSongs.update { current ->
+            if (videoId in current) {
+                val newSet = current - videoId
+                viewModelScope.launch {
+                    dataStoreManager.putString(DISLIKED_SONGS, newSet.joinToString(","))
+                }
+                newSet
+            } else {
+                val newSet = current + videoId
+                viewModelScope.launch {
+                    dataStoreManager.putString(DISLIKED_SONGS, newSet.joinToString(","))
+                }
+                newSet
+            }
+        }
+        _enjoyedSongs.update { current ->
+            val newSet = current - videoId
+            viewModelScope.launch {
+                dataStoreManager.putString(ENJOYED_SONGS, newSet.joinToString(","))
+            }
+            newSet
+        }
+    }
 
     override fun onCleared() {
         Logger.w("Check onCleared", "onCleared")

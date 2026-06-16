@@ -227,7 +227,14 @@ class AlbumViewModel(
             makeToast(getString(Res.string.playlist_is_empty))
             return
         }
-        val shuffleList = uiState.value.listTrack.shuffled()
+        val shuffleList = uiState.value.listTrack.toMutableList()
+        // Manual Fisher-Yates shuffle
+        for (i in shuffleList.size - 1 downTo 1) {
+            val j = (Math.random() * (i + 1)).toInt()
+            val temp = shuffleList[i]
+            shuffleList[i] = shuffleList[j]
+            shuffleList[j] = temp
+        }
         val randomIndex = shuffleList.indices.random()
         setQueueData(
             QueueData.Data(

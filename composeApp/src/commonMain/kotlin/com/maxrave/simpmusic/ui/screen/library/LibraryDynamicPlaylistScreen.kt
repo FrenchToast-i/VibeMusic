@@ -453,7 +453,14 @@ fun LibraryDynamicPlaylistScreen(
                             if (type == LibraryDynamicPlaylistType.TopTracks) {
                                 val data = analyticsUIState.topTracks.data
                                 if (!data.isNullOrEmpty()) {
-                                    val shuffled = data.shuffled()
+                                    val shuffled = data.toMutableList()
+                                    // Manual Fisher-Yates shuffle
+                                    for (i in shuffled.size - 1 downTo 1) {
+                                        val j = (Math.random() * (i + 1)).toInt()
+                                        val temp = shuffled[i]
+                                        shuffled[i] = shuffled[j]
+                                        shuffled[j] = temp
+                                    }
                                     val first = shuffled.first().second
                                     sharedViewModel.setQueueData(
                                         QueueData.Data(

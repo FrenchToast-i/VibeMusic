@@ -44,9 +44,17 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -112,6 +120,8 @@ import com.maxrave.simpmusic.ui.component.QuickPicksItem
 import com.maxrave.simpmusic.ui.component.ReviewDialog
 import com.maxrave.simpmusic.ui.component.RippleIconButton
 import com.maxrave.simpmusic.ui.component.ShareSavedLyricsDialog
+import com.maxrave.simpmusic.ui.component.LiquidGlassIconButton
+import com.maxrave.simpmusic.ui.component.liquidGlass
 import com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination
 import com.maxrave.simpmusic.ui.navigation.destination.home.MoodDestination
 import com.maxrave.simpmusic.ui.navigation.destination.home.NotificationDestination
@@ -138,6 +148,9 @@ import com.maxrave.simpmusic.viewModel.HomeViewModel.Companion.HOME_PARAMS_SLEEP
 import com.maxrave.simpmusic.viewModel.HomeViewModel.Companion.HOME_PARAMS_WORKOUT
 import com.maxrave.simpmusic.viewModel.ListState
 import com.maxrave.simpmusic.viewModel.SharedViewModel
+import com.maxrave.simpmusic.expect.ui.PlatformBackdrop
+import com.maxrave.simpmusic.expect.ui.rememberBackdrop
+import com.maxrave.simpmusic.expect.ui.layerBackdrop
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
@@ -286,6 +299,8 @@ fun HomeScreen(
         rememberHazeState(
             blurEnabled = true,
         )
+
+    val backdrop = rememberBackdrop()
 
     LaunchedEffect(scrollState) {
         snapshotFlow { scrollState.firstVisibleItemIndex }
@@ -529,8 +544,17 @@ fun HomeScreen(
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .height(300.dp)
-                                                .angledGradientBackground(listOf(animatedColor, md_theme_dark_background), 25f),
+                                                .height(500.dp)
+                                                .angledGradientBackground(
+                                                    listOf(
+                                                        Color(0xFF1E3A8A),
+                                                        Color(0xFF3B82F6),
+                                                        Color(0xFF8B5CF6),
+                                                        Color(0xFFEC4899),
+                                                        Color(0xFF1F2937),
+                                                    ),
+                                                    25f,
+                                                ),
                                     ) {
                                         Box(
                                             modifier =
@@ -568,6 +592,7 @@ fun HomeScreen(
                                         AccountLayout(
                                             accountName = accountInfo?.first ?: "",
                                             url = accountInfo?.second ?: "",
+                                            backdrop = backdrop,
                                         )
                                         Spacer(Modifier.height(8.dp))
                                     }
@@ -768,7 +793,7 @@ fun HomeScreen(
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically(),
                 ) {
-                    HomeTopAppBar(navController)
+                    HomeTopAppBar(navController, backdrop)
                 }
                 AnimatedVisibility(
                     visible = !isScrollingUp,
@@ -784,46 +809,87 @@ fun HomeScreen(
                                 ),
                     )
                 }
+                var tagsExpanded by remember { mutableStateOf(false) }
                 Row(
                     modifier =
                         Modifier
-                            .horizontalScroll(chipRowState)
-                            .padding(vertical = 8.dp, horizontal = 15.dp)
-                            .background(Color.Transparent),
+                            .padding(start = 12.dp, top = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    listOfHomeChip.forEach { id ->
-                        val isSelected =
-                            when (params) {
-                                HOME_PARAMS_RELAX -> id == Res.string.relax
-                                HOME_PARAMS_SLEEP -> id == Res.string.sleep
-                                HOME_PARAMS_ENERGIZE -> id == Res.string.energize
-                                HOME_PARAMS_SAD -> id == Res.string.sad
-                                HOME_PARAMS_ROMANCE -> id == Res.string.romance
-                                HOME_PARAMS_FEEL_GOOD -> id == Res.string.feel_good
-                                HOME_PARAMS_WORKOUT -> id == Res.string.workout
-                                HOME_PARAMS_PARTY -> id == Res.string.party
-                                HOME_PARAMS_COMMUTE -> id == Res.string.commute
-                                HOME_PARAMS_FOCUS -> id == Res.string.focus
-                                else -> id == Res.string.all
-                            }
-                        Chip(
-                            isAnimated = loading,
-                            isSelected = isSelected,
-                            text = stringResource(id),
+                    if (backdrop != null) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .liquidGlass(backdrop, RoundedCornerShape(16.dp)),
                         ) {
-                            when (id) {
-                                Res.string.all -> viewModel.setParams(null)
-                                Res.string.relax -> viewModel.setParams(HOME_PARAMS_RELAX)
-                                Res.string.sleep -> viewModel.setParams(HOME_PARAMS_SLEEP)
-                                Res.string.energize -> viewModel.setParams(HOME_PARAMS_ENERGIZE)
-                                Res.string.sad -> viewModel.setParams(HOME_PARAMS_SAD)
-                                Res.string.romance -> viewModel.setParams(HOME_PARAMS_ROMANCE)
-                                Res.string.feel_good -> viewModel.setParams(HOME_PARAMS_FEEL_GOOD)
-                                Res.string.workout -> viewModel.setParams(HOME_PARAMS_WORKOUT)
-                                Res.string.party -> viewModel.setParams(HOME_PARAMS_PARTY)
-                                Res.string.commute -> viewModel.setParams(HOME_PARAMS_COMMUTE)
-                                Res.string.focus -> viewModel.setParams(HOME_PARAMS_FOCUS)
+                            IconButton(
+                                onClick = { tagsExpanded = !tagsExpanded },
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = if (tagsExpanded) "Collapse tags" else "Expand tags",
+                                    tint = Color.White,
+                                )
+                            }
+                        }
+                    } else {
+                        IconButton(
+                            onClick = { tagsExpanded = !tagsExpanded },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = if (tagsExpanded) "Collapse tags" else "Expand tags",
+                                tint = Color.White,
+                            )
+                        }
+                    }
+                    if (tagsExpanded) {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .padding(vertical = 8.dp, horizontal = 12.dp)
+                                    .horizontalScroll(chipRowState),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            listOfHomeChip.forEach { id ->
+                                val isSelected =
+                                    when (params) {
+                                        HOME_PARAMS_RELAX -> id == Res.string.relax
+                                        HOME_PARAMS_SLEEP -> id == Res.string.sleep
+                                        HOME_PARAMS_ENERGIZE -> id == Res.string.energize
+                                        HOME_PARAMS_SAD -> id == Res.string.sad
+                                        HOME_PARAMS_ROMANCE -> id == Res.string.romance
+                                        HOME_PARAMS_FEEL_GOOD -> id == Res.string.feel_good
+                                        HOME_PARAMS_WORKOUT -> id == Res.string.workout
+                                        HOME_PARAMS_PARTY -> id == Res.string.party
+                                        HOME_PARAMS_COMMUTE -> id == Res.string.commute
+                                        HOME_PARAMS_FOCUS -> id == Res.string.focus
+                                        else -> id == Res.string.all
+                                    }
+                                Chip(
+                                    isAnimated = loading,
+                                    isSelected = isSelected,
+                                    text = stringResource(id),
+                                    backdrop = backdrop,
+                                    onClick = {
+                                        when (id) {
+                                            Res.string.all -> viewModel.setParams(null)
+                                            Res.string.relax -> viewModel.setParams(HOME_PARAMS_RELAX)
+                                            Res.string.sleep -> viewModel.setParams(HOME_PARAMS_SLEEP)
+                                            Res.string.energize -> viewModel.setParams(HOME_PARAMS_ENERGIZE)
+                                            Res.string.sad -> viewModel.setParams(HOME_PARAMS_SAD)
+                                            Res.string.romance -> viewModel.setParams(HOME_PARAMS_ROMANCE)
+                                            Res.string.feel_good -> viewModel.setParams(HOME_PARAMS_FEEL_GOOD)
+                                            Res.string.workout -> viewModel.setParams(HOME_PARAMS_WORKOUT)
+                                            Res.string.party -> viewModel.setParams(HOME_PARAMS_PARTY)
+                                            Res.string.commute -> viewModel.setParams(HOME_PARAMS_COMMUTE)
+                                            Res.string.focus -> viewModel.setParams(HOME_PARAMS_FOCUS)
+                                        }
+                                    },
+                                )
                             }
                         }
                     }
@@ -835,12 +901,13 @@ fun HomeScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeTopAppBar(navController: NavController) {
+fun HomeTopAppBar(navController: NavController, backdrop: PlatformBackdrop? = null) {
     val hour =
         remember {
             val date = now().time
             date.hour
         }
+    var showMenu by remember { mutableStateOf(false) }
     TopAppBar(
         windowInsets =
             TopAppBarDefaults.windowInsets.exclude(
@@ -874,18 +941,69 @@ fun HomeTopAppBar(navController: NavController) {
                             }
                         },
                     style = typo().bodySmall,
+                    color = Color.White,
                 )
             }
         },
         actions = {
-            RippleIconButton(resId = Res.drawable.outline_notifications_24) {
-                navController.navigate(NotificationDestination)
-            }
-            RippleIconButton(resId = Res.drawable.baseline_history_24) {
-                navController.navigate(RecentlySongsDestination)
-            }
-            RippleIconButton(resId = Res.drawable.baseline_settings_24) {
-                navController.navigate(SettingsDestination)
+            Box {
+                if (backdrop != null) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .liquidGlass(backdrop, RoundedCornerShape(16.dp)),
+                    ) {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Menu",
+                                tint = Color.White,
+                            )
+                        }
+                    }
+                } else {
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Menu",
+                            tint = Color.White,
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.background(Color(0xFF1F2937)),
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Notifications") },
+                        onClick = {
+                            showMenu = false
+                            navController.navigate(NotificationDestination)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Recently Added") },
+                        onClick = {
+                            showMenu = false
+                            navController.navigate(RecentlySongsDestination)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Settings") },
+                        onClick = {
+                            showMenu = false
+                            navController.navigate(SettingsDestination)
+                        },
+                    )
+                }
             }
         },
         colors =
@@ -899,8 +1017,21 @@ fun HomeTopAppBar(navController: NavController) {
 fun AccountLayout(
     accountName: String,
     url: String,
+    backdrop: PlatformBackdrop? = null,
 ) {
-    Column {
+    val cardModifier = if (backdrop != null) {
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 5.dp, vertical = 5.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .liquidGlass(backdrop, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    } else {
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 5.dp, vertical = 5.dp)
+    }
+    Column(modifier = cardModifier) {
         Text(
             text = stringResource(Res.string.welcome_back),
             style = typo().bodyMedium,
@@ -909,7 +1040,6 @@ fun AccountLayout(
         )
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp),
         ) {
             AsyncImage(
                 model =

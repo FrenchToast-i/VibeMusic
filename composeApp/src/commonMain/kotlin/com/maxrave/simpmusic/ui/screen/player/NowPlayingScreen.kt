@@ -70,6 +70,8 @@ import androidx.compose.material.icons.rounded.Forward5
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Replay5
 import androidx.compose.material.icons.rounded.ThumbsUpDown
+import androidx.compose.material.icons.rounded.ThumbUp
+import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -286,6 +288,8 @@ fun NowPlayingScreenContent(
     val screenDataState by sharedViewModel.nowPlayingScreenData.collectAsStateWithLifecycle()
     val timelineState by sharedViewModel.timeline.collectAsStateWithLifecycle()
     val likeStatus by sharedViewModel.likeStatus.collectAsStateWithLifecycle()
+    val enjoyedSongs by sharedViewModel.enjoyedSongs.collectAsStateWithLifecycle()
+    val dislikedSongs by sharedViewModel.dislikedSongs.collectAsStateWithLifecycle()
 
     val shouldShowVideo by sharedViewModel.getVideo.collectAsStateWithLifecycle()
     val translatedVoteState by sharedViewModel.translatedVoteState.collectAsStateWithLifecycle()
@@ -1614,6 +1618,29 @@ fun NowPlayingScreenContent(
                                         HeartCheckBox(checked = controllerState.isLiked, size = 32) {
                                             sharedViewModel.onUIEvent(UIEvent.ToggleLike)
                                         }
+                                        Spacer(modifier = Modifier.size(8.dp))
+                                        IconButton(
+                                            onClick = { sharedViewModel.toggleEnjoy(screenDataState.songInfoData?.videoId ?: "") },
+                                            modifier = Modifier.size(32.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.ThumbUp,
+                                                contentDescription = "Enjoy",
+                                                tint = if (screenDataState.songInfoData?.videoId in enjoyedSongs) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f),
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { sharedViewModel.toggleDislike(screenDataState.songInfoData?.videoId ?: "") },
+                                            modifier = Modifier.size(32.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.ThumbDown,
+                                                contentDescription = "Don't enjoy",
+                                                tint = if (screenDataState.songInfoData?.videoId in dislikedSongs) Color(0xFFF44336) else Color.White.copy(alpha = 0.6f),
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
                                     }
                                     if (getPlatform() == Platform.Android) {
                                         // Real Slider
@@ -2109,6 +2136,29 @@ fun NowPlayingScreenContent(
                                                 Spacer(modifier = Modifier.size(12.dp))
                                                 HeartCheckBox(checked = controllerState.isLiked, size = 32) {
                                                     sharedViewModel.onUIEvent(UIEvent.ToggleLike)
+                                                }
+                                                Spacer(modifier = Modifier.size(8.dp))
+                                                IconButton(
+                                                    onClick = { sharedViewModel.toggleEnjoy(screenDataState.songInfoData?.videoId ?: "") },
+                                                    modifier = Modifier.size(32.dp),
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.ThumbUp,
+                                                        contentDescription = "Enjoy",
+                                                        tint = if (screenDataState.songInfoData?.videoId in enjoyedSongs) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f),
+                                                        modifier = Modifier.size(20.dp),
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = { sharedViewModel.toggleDislike(screenDataState.songInfoData?.videoId ?: "") },
+                                                    modifier = Modifier.size(32.dp),
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.ThumbDown,
+                                                        contentDescription = "Don't enjoy",
+                                                        tint = if (screenDataState.songInfoData?.videoId in dislikedSongs) Color(0xFFF44336) else Color.White.copy(alpha = 0.6f),
+                                                        modifier = Modifier.size(20.dp),
+                                                    )
                                                 }
                                             }
                                         }

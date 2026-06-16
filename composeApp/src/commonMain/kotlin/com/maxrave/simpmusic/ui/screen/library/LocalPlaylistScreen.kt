@@ -52,6 +52,7 @@ import androidx.compose.material.icons.automirrored.sharp.Sort
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -851,6 +852,42 @@ fun LocalPlaylistScreen(
                                         Box(
                                             modifier =
                                                 Modifier
+                                                    .size(48.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color.White.copy(alpha = 0.12f))
+                                                    .clickable {
+                                                        viewModel.onUIEvent(LocalPlaylistUIEvent.SmartShuffle)
+                                                    },
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Shuffle,
+                                                contentDescription = "Smart Shuffle",
+                                                tint = Color(0xFF4C82EF),
+                                                modifier = Modifier.size(22.dp),
+                                            )
+                                        }
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .size(48.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color.White.copy(alpha = 0.12f))
+                                                    .clickable {
+                                                        viewModel.onUIEvent(LocalPlaylistUIEvent.AIRecommend)
+                                                    },
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.AutoAwesome,
+                                                contentDescription = "AI Recommend",
+                                                tint = Color(0xFFD96570),
+                                                modifier = Modifier.size(22.dp),
+                                            )
+                                        }
+                                        Box(
+                                            modifier =
+                                                Modifier
                                                     .height(48.dp)
                                                     .widthIn(min = 110.dp)
                                                     .clip(CircleShape)
@@ -1108,6 +1145,26 @@ fun LocalPlaylistScreen(
                                             fillMaxSize = true,
                                         ) {
                                             viewModel.onUIEvent(LocalPlaylistUIEvent.ShuffleClick)
+                                        }
+                                        Spacer(Modifier.size(5.dp))
+                                        RippleIconButton(
+                                            modifier =
+                                                Modifier.size(36.dp),
+                                            resId = Res.drawable.baseline_shuffle_24,
+                                            fillMaxSize = true,
+                                            tint = Color(0xFF4C82EF),
+                                        ) {
+                                            viewModel.onUIEvent(LocalPlaylistUIEvent.SmartShuffle)
+                                        }
+                                        Spacer(Modifier.size(5.dp))
+                                        RippleIconButton(
+                                            modifier =
+                                                Modifier.size(36.dp),
+                                            resId = Res.drawable.baseline_tips_and_updates_24,
+                                            fillMaxSize = true,
+                                            tint = Color(0xFFD96570),
+                                        ) {
+                                            viewModel.onUIEvent(LocalPlaylistUIEvent.AIRecommend)
                                         }
                                         Spacer(Modifier.size(5.dp))
                                         RippleIconButton(

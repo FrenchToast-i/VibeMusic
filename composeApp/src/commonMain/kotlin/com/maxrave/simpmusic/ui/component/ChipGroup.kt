@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.maxrave.simpmusic.expect.ui.PlatformBackdrop
+import com.maxrave.simpmusic.expect.ui.rememberBackdrop
 
 @Composable
 fun Chip(
@@ -24,6 +26,7 @@ fun Chip(
     isSelected: Boolean = false,
     text: String,
     onClick: () -> Unit,
+    backdrop: PlatformBackdrop? = null,
 ) {
     InfiniteBorderAnimationView(
         isAnimated = isAnimated && isSelected,
@@ -35,7 +38,13 @@ fun Chip(
         oneCircleDurationMillis = 2500,
     ) {
         CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+            val chipModifier = if (backdrop != null) {
+                Modifier.liquidGlass(backdrop, CircleShape)
+            } else {
+                Modifier
+            }
             ElevatedFilterChip(
+                modifier = chipModifier,
                 shape = CircleShape,
                 colors =
                     FilterChipDefaults.elevatedFilterChipColors(

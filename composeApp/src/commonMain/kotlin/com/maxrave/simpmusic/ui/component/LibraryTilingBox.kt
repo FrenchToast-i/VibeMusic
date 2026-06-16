@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.maxrave.simpmusic.extension.NonLazyGrid
+import com.maxrave.simpmusic.expect.ui.PlatformBackdrop
 import com.maxrave.simpmusic.ui.navigation.destination.library.LibraryDynamicPlaylistDestination
 import com.maxrave.simpmusic.ui.screen.library.LibraryDynamicPlaylistType
 import com.maxrave.simpmusic.ui.theme.typo
@@ -36,7 +37,7 @@ import simpmusic.composeapp.generated.resources.followed
 import simpmusic.composeapp.generated.resources.most_played
 
 @Composable
-fun LibraryTilingBox(navController: NavController) {
+fun LibraryTilingBox(navController: NavController, backdrop: PlatformBackdrop? = null) {
     val listItem =
         listOf(
             LibraryTilingState.Favorite,
@@ -57,6 +58,7 @@ fun LibraryTilingBox(navController: NavController) {
         ) {
             LibraryTilingItem(
                 listItem[number],
+                backdrop = backdrop,
                 onClick = {
                     when (listItem[number]) {
                         LibraryTilingState.Favorite -> {
@@ -100,14 +102,21 @@ fun LibraryTilingBox(navController: NavController) {
 @Composable
 fun LibraryTilingItem(
     state: LibraryTilingState,
+    backdrop: PlatformBackdrop? = null,
     onClick: () -> Unit = {},
 ) {
     val title = stringResource(state.title)
+    val cardModifier = if (backdrop != null) {
+        Modifier.fillMaxWidth().liquidGlass(backdrop, RoundedCornerShape(8.dp)).clickable {
+            onClick.invoke()
+        }
+    } else {
+        Modifier.fillMaxWidth().clickable {
+            onClick.invoke()
+        }
+    }
     ElevatedCard(
-        modifier =
-            Modifier.fillMaxWidth().clickable {
-                onClick.invoke()
-            },
+        modifier = cardModifier,
         shape = RoundedCornerShape(8.dp),
         elevation = CardDefaults.elevatedCardElevation(),
         colors =

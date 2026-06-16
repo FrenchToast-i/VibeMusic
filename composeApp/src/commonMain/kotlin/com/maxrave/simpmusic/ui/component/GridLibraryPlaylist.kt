@@ -52,6 +52,7 @@ import com.maxrave.domain.utils.LocalResource
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.extension.angledGradientBackground
 import com.maxrave.simpmusic.extension.isScrollingUp
+import com.maxrave.simpmusic.expect.ui.PlatformBackdrop
 import com.maxrave.simpmusic.ui.navigation.destination.list.AlbumDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.LocalPlaylistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
@@ -74,6 +75,7 @@ internal inline fun <reified T> GridLibraryPlaylist(
     noinline onScrolling: (onTop: Boolean) -> Unit = { _ -> },
     noinline createNewPlaylist: (() -> Unit)? = null,
     noinline onReload: () -> Unit,
+    backdrop: PlatformBackdrop? = null,
 ) {
     Logger.w("GridLibraryPlaylist", "Generic Type: ${T::class.simpleName}")
     val state = rememberLazyGridState()
@@ -133,7 +135,13 @@ internal inline fun <reified T> GridLibraryPlaylist(
                                         Modifier
                                             .padding(10.dp),
                                 ) {
-                                    Box(
+                                    val boxModifier = if (backdrop != null) {
+                                        Modifier
+                                            .size(132.dp)
+                                            .aspectRatio(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .liquidGlass(backdrop, RoundedCornerShape(10.dp))
+                                    } else {
                                         Modifier
                                             .size(132.dp)
                                             .aspectRatio(1f)
@@ -145,7 +153,10 @@ internal inline fun <reified T> GridLibraryPlaylist(
                                                         white.copy(alpha = 0.8f),
                                                     ),
                                                 degrees = 45f,
-                                            ),
+                                            )
+                                    }
+                                    Box(
+                                        modifier = boxModifier,
                                         Alignment.Center,
                                     ) {
                                         Icon(

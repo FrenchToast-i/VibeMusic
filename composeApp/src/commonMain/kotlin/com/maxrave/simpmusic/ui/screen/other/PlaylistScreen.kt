@@ -45,6 +45,8 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.ThumbUp
+import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -154,6 +156,7 @@ import simpmusic.composeapp.generated.resources.baseline_pause_circle_24
 import simpmusic.composeapp.generated.resources.baseline_play_circle_24
 import simpmusic.composeapp.generated.resources.baseline_sensors_24
 import simpmusic.composeapp.generated.resources.baseline_shuffle_24
+import simpmusic.composeapp.generated.resources.baseline_smart_shuffle_24
 import simpmusic.composeapp.generated.resources.download_button
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
@@ -188,6 +191,8 @@ fun PlaylistScreen(
     val liked by viewModel.liked.collectAsStateWithLifecycle()
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val tracksListState by viewModel.tracksListState.collectAsStateWithLifecycle()
+    val enjoyedSongs by viewModel.enjoyedSongs.collectAsStateWithLifecycle()
+    val dislikedSongs by viewModel.dislikedSongs.collectAsStateWithLifecycle()
 
     var showSearchBar by rememberSaveable { mutableStateOf(false) }
     var searchBarHeightPx by remember { mutableStateOf(0) }
@@ -719,21 +724,21 @@ fun PlaylistScreen(
                                                 }
                                                 if (isMobilePortrait) {
                                                     // Apple Music-style action row:
-                                                    // [Shuffle][Play pill][Download/More] (cluster centered, all 48dp matching size)
+                                                    // [Shuffle][Smart Shuffle][Play pill][Download/More] (cluster centered, all 48dp matching size)
                                                     val isThisPlaying = isPlaying && playingPlaylistId == data.id
                                                     Row(
                                                         modifier =
                                                             Modifier
                                                                 .fillMaxWidth()
                                                                 .padding(vertical = 8.dp),
-                                                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                                                         verticalAlignment = Alignment.CenterVertically,
                                                     ) {
                                                         if (!data.isRadio) {
                                                             Box(
                                                                 modifier =
                                                                     Modifier
-                                                                        .size(48.dp)
+                                                                        .size(40.dp)
                                                                         .clip(CircleShape)
                                                                         .background(Color.White.copy(alpha = 0.12f))
                                                                         .clickable {
@@ -745,7 +750,25 @@ fun PlaylistScreen(
                                                                     imageVector = Icons.Rounded.Shuffle,
                                                                     contentDescription = "Shuffle",
                                                                     tint = Color.White,
-                                                                    modifier = Modifier.size(22.dp),
+                                                                    modifier = Modifier.size(20.dp),
+                                                                )
+                                                            }
+                                                            Box(
+                                                                modifier =
+                                                                    Modifier
+                                                                        .size(40.dp)
+                                                                        .clip(CircleShape)
+                                                                        .background(Color.White.copy(alpha = 0.12f))
+                                                                        .clickable {
+                                                                            viewModel.onUIEvent(PlaylistUIEvent.SmartShuffle)
+                                                                        },
+                                                                contentAlignment = Alignment.Center,
+                                                            ) {
+                                                                Icon(
+                                                                    painter = painterResource(Res.drawable.baseline_smart_shuffle_24),
+                                                                    contentDescription = "Smart Shuffle",
+                                                                    tint = Color.White,
+                                                                    modifier = Modifier.size(20.dp),
                                                                 )
                                                             }
                                                         }
@@ -1082,6 +1105,35 @@ fun PlaylistScreen(
                                         },
                                         modifier = Modifier,
                                     )
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 72.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    IconButton(
+                                        onClick = { viewModel.toggleEnjoy(item.videoId) },
+                                        modifier = Modifier.size(32.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.ThumbUp,
+                                            contentDescription = "Enjoy",
+                                            tint = if (item.videoId in enjoyedSongs) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.toggleDislike(item.videoId) },
+                                        modifier = Modifier.size(32.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.ThumbDown,
+                                            contentDescription = "Don't enjoy",
+                                            tint = if (item.videoId in dislikedSongs) Color(0xFFF44336) else Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
                                 }
                                 if (isMobilePortrait && index < filteredTrack.size - 1) {
                                     HorizontalDivider(

@@ -105,6 +105,9 @@ import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.Platform
 import com.maxrave.simpmusic.expect.ui.fileSaverResult
 import com.maxrave.simpmusic.expect.ui.openEqResult
+import com.maxrave.simpmusic.expect.ui.PlatformBackdrop
+import com.maxrave.simpmusic.expect.ui.rememberBackdrop
+import com.maxrave.simpmusic.extension.angledGradientBackground
 import com.maxrave.simpmusic.extension.bytesToMB
 import com.maxrave.simpmusic.extension.displayString
 import com.maxrave.simpmusic.extension.isTwoLetterCode
@@ -113,8 +116,10 @@ import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.ui.component.ActionButton
 import com.maxrave.simpmusic.ui.component.CenterLoadingBox
 import com.maxrave.simpmusic.ui.component.EndOfPage
+import com.maxrave.simpmusic.ui.component.LiquidGlassIconButton
 import com.maxrave.simpmusic.ui.component.RippleIconButton
 import com.maxrave.simpmusic.ui.component.SettingItem
+import com.maxrave.simpmusic.ui.component.liquidGlass
 import com.maxrave.simpmusic.ui.navigation.destination.home.CreditDestination
 import com.maxrave.simpmusic.ui.navigation.destination.login.DiscordLoginDestination
 import com.maxrave.simpmusic.ui.navigation.destination.login.LoginDestination
@@ -355,6 +360,7 @@ fun SettingScreen(
     viewModel: SettingsViewModel = koinViewModel(),
     sharedViewModel: SharedViewModel = koinInject(),
 ) {
+    val backdrop = rememberBackdrop()
     val platformContext = LocalPlatformContext.current
     val pl = com.mohamedrejeb.calf.core.LocalPlatformContext.current
     val localDensity = LocalDensity.current
@@ -512,11 +518,35 @@ fun SettingScreen(
                 .hazeSource(hazeState),
     ) {
         item {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(500.dp)
+                        .angledGradientBackground(
+                            listOf(
+                                Color(0xFF1E3A8A),
+                                Color(0xFF3B82F6),
+                                Color(0xFF8B5CF6),
+                                Color(0xFFEC4899),
+                                Color(0xFF1F2937),
+                            ),
+                            25f,
+                        ),
+            )
+        }
+        item {
             Spacer(Modifier.height(64.dp))
         }
         item(key = "user_interface") {
-            Column {
-                Spacer(Modifier.height(16.dp))
+            Column(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .liquidGlass(backdrop, RoundedCornerShape(16.dp))
+                        .padding(vertical = 8.dp, horizontal = 12.dp),
+            ) {
+                Spacer(Modifier.height(8.dp))
                 Text(text = stringResource(Res.string.user_interface), style = typo().labelMedium, color = white)
                 SettingItem(
                     title = stringResource(Res.string.translucent_bottom_navigation_bar),
@@ -545,15 +575,22 @@ fun SettingScreen(
                         isEnable = getPlatform() == Platform.Android,
                     )
                 }
+                Spacer(Modifier.height(8.dp))
             }
         }
         item(key = "content") {
-            Column {
+            Column(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .liquidGlass(backdrop, RoundedCornerShape(16.dp))
+                        .padding(vertical = 8.dp, horizontal = 12.dp),
+            ) {
+                Spacer(Modifier.height(8.dp))
                 Text(
                     text = stringResource(Res.string.content),
                     style = typo().labelMedium,
                     color = white,
-                    modifier = Modifier.padding(vertical = 8.dp),
                 )
                 SettingItem(
                     title = stringResource(Res.string.youtube_account),
@@ -761,6 +798,7 @@ fun SettingScreen(
                     subtitle = stringResource(Res.string.proxy_description),
                     switch = (usingProxy to { viewModel.setUsingProxy(it) }),
                 )
+                Spacer(Modifier.height(8.dp))
             }
         }
         item(key = "proxy") {

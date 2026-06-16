@@ -587,9 +587,10 @@ fun SearchScreen(
                                     isAnimated = uiState is SearchScreenUIState.Loading,
                                     isSelected = isSelected,
                                     text = stringResource(id.toStringRes()),
-                                ) {
-                                    searchViewModel.setSearchType(id)
-                                }
+                                    onClick = {
+                                        searchViewModel.setSearchType(id)
+                                    },
+                                )
                                 Spacer(modifier = Modifier.width(4.dp))
                             }
                         }

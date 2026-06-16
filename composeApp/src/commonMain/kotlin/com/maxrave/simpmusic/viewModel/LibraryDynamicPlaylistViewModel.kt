@@ -149,7 +149,14 @@ class LibraryDynamicPlaylistViewModel(
     fun shuffle(type: LibraryDynamicPlaylistType) {
         val targetList = getSongList(type)
         if (targetList.isEmpty()) return
-        val shuffledList = targetList.shuffled()
+        val shuffledList = targetList.toMutableList()
+        // Manual Fisher-Yates shuffle
+        for (i in shuffledList.size - 1 downTo 1) {
+            val j = (Math.random() * (i + 1)).toInt()
+            val temp = shuffledList[i]
+            shuffledList[i] = shuffledList[j]
+            shuffledList[j] = temp
+        }
         val firstTrack = shuffledList.first()
         setQueueData(
             QueueData.Data(

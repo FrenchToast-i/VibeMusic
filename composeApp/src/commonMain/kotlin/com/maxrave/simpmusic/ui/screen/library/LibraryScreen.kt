@@ -26,6 +26,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.AutoGraph
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,6 +52,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -66,6 +69,7 @@ import com.maxrave.domain.utils.LocalResource
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.extension.copy
 import com.maxrave.simpmusic.extension.isScrollingUp
+import com.maxrave.simpmusic.extension.angledGradientBackground
 import com.maxrave.simpmusic.ui.component.Chip
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.GridLibraryPlaylist
@@ -73,6 +77,11 @@ import com.maxrave.simpmusic.ui.component.LibraryItem
 import com.maxrave.simpmusic.ui.component.LibraryItemState
 import com.maxrave.simpmusic.ui.component.LibraryItemType
 import com.maxrave.simpmusic.ui.component.LibraryTilingBox
+import com.maxrave.simpmusic.ui.component.LiquidGlassIconButton
+import com.maxrave.simpmusic.ui.component.liquidGlass
+import com.maxrave.simpmusic.expect.ui.PlatformBackdrop
+import com.maxrave.simpmusic.expect.ui.rememberBackdrop
+import com.maxrave.simpmusic.expect.ui.layerBackdrop
 import com.maxrave.simpmusic.ui.navigation.destination.home.AnalyticsDestination
 import com.maxrave.simpmusic.ui.theme.transparent
 import com.maxrave.simpmusic.ui.theme.typo
@@ -133,6 +142,7 @@ fun LibraryScreen(
     val chartPlaylists by viewModel.chartPlaylists.collectAsStateWithLifecycle()
     val recentlyAdded by viewModel.recentlyAdded.collectAsStateWithLifecycle()
     val accountThumbnail by viewModel.accountThumbnail.collectAsStateWithLifecycle()
+    val backdrop = rememberBackdrop()
     val hazeState =
         rememberHazeState(
             blurEnabled = true,
@@ -198,7 +208,24 @@ fun LibraryScreen(
         modifier = Modifier.hazeSource(hazeState),
         targetState = currentFilter,
     ) { filter ->
-        when (filter) {
+        Box {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(2000.dp)
+                        .angledGradientBackground(
+                            listOf(
+                                Color(0xFF1E3A8A),
+                                Color(0xFF3B82F6),
+                                Color(0xFF8B5CF6),
+                                Color(0xFFEC4899),
+                                Color(0xFF1F2937),
+                            ),
+                            25f,
+                        ),
+            )
+            when (filter) {
             LibraryChipType.YOUR_LIBRARY -> {
                 val state = rememberLazyListState()
                 val isScrollingUp by state.isScrollingUp()
@@ -220,7 +247,7 @@ fun LibraryScreen(
                     state = state,
                 ) {
                     item {
-                        LibraryTilingBox(navController)
+                        LibraryTilingBox(navController, backdrop)
                     }
 
                     if (!listCanvasSong.data.isNullOrEmpty()) {
@@ -264,9 +291,8 @@ fun LibraryScreen(
                     youTubePlaylist,
                     emptyText = Res.string.no_YouTube_playlists,
                     onScrolling = onScrolling,
-                ) {
-                    viewModel.getYouTubePlaylist()
-                }
+                    onReload = { viewModel.getYouTubePlaylist() },
+                )
             }
 
             LibraryChipType.YOUTUBE_MIX_FOR_YOU -> {
@@ -276,9 +302,8 @@ fun LibraryScreen(
                     youTubeMixForYou,
                     emptyText = Res.string.no_mixes_found,
                     onScrolling = onScrolling,
-                ) {
-                    viewModel.getYouTubeMixedForYou()
-                }
+                    onReload = { viewModel.getYouTubeMixedForYou() },
+                )
             }
 
             LibraryChipType.LOCAL_PLAYLIST -> {
@@ -291,9 +316,9 @@ fun LibraryScreen(
                     createNewPlaylist = {
                         showAddSheet = true
                     },
-                ) {
-                    viewModel.getLocalPlaylist()
-                }
+                    backdrop = backdrop,
+                    onReload = { viewModel.getLocalPlaylist() },
+                )
             }
 
             LibraryChipType.FAVORITE_PLAYLIST -> {
@@ -303,9 +328,9 @@ fun LibraryScreen(
                     favoritePlaylist,
                     emptyText = Res.string.no_favorite_playlists,
                     onScrolling = onScrolling,
-                ) {
-                    viewModel.getPlaylistFavorite()
-                }
+                    backdrop = backdrop,
+                    onReload = { viewModel.getPlaylistFavorite() },
+                )
             }
 
             LibraryChipType.DOWNLOADED_PLAYLIST -> {
@@ -315,9 +340,9 @@ fun LibraryScreen(
                     downloadedPlaylist,
                     emptyText = Res.string.no_playlists_downloaded,
                     onScrolling = onScrolling,
-                ) {
-                    viewModel.getDownloadedPlaylist()
-                }
+                    backdrop = backdrop,
+                    onReload = { viewModel.getDownloadedPlaylist() },
+                )
             }
 
             LibraryChipType.FAVORITE_PODCAST -> {
@@ -327,9 +352,9 @@ fun LibraryScreen(
                     favoritePodcasts,
                     emptyText = Res.string.no_favorite_podcasts,
                     onScrolling = onScrolling,
-                ) {
-                    viewModel.getFavoritePodcasts()
-                }
+                    backdrop = backdrop,
+                    onReload = { viewModel.getFavoritePodcasts() },
+                )
             }
 
             LibraryChipType.CHART -> {
@@ -339,9 +364,9 @@ fun LibraryScreen(
                     chartPlaylists,
                     emptyText = Res.string.no_charts_found,
                     onScrolling = onScrolling,
-                ) {
-                    viewModel.getChartPlaylists()
-                }
+                    backdrop = backdrop,
+                    onReload = { viewModel.getChartPlaylists() },
+                )
             }
         }
     }
@@ -445,21 +470,29 @@ fun LibraryScreen(
                     containerColor = Color.Transparent,
                 ),
             actions = {
-                IconButton(
-                    onClick = {
-                        navController.navigate(AnalyticsDestination)
-                    },
+                Box(
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .liquidGlass(backdrop, CircleShape),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box {
-                        Icon(Icons.Rounded.AutoGraph, "Analytics", tint = Color.White)
-                        Text(
-                            "NEW",
-                            Modifier.align(Alignment.BottomEnd),
-                            style =
-                                typo().bodySmall.copy(
-                                    fontSize = 5.sp,
-                                ),
-                        )
+                    IconButton(
+                        onClick = {
+                            navController.navigate(AnalyticsDestination)
+                        },
+                    ) {
+                        Box {
+                            Icon(Icons.Rounded.AutoGraph, "Analytics", tint = Color.White)
+                            Text(
+                                "NEW",
+                                Modifier.align(Alignment.BottomEnd),
+                                style =
+                                    typo().bodySmall.copy(
+                                        fontSize = 5.sp,
+                                    ),
+                            )
+                        }
                     }
                 }
             },
@@ -488,37 +521,76 @@ fun LibraryScreen(
                 }
             },
         )
+        var tagsExpanded by remember { mutableStateOf(false) }
         Row(
             modifier =
                 Modifier
-                    .horizontalScroll(chipRowState)
-                    .padding(horizontal = 15.dp)
-                    .padding(bottom = 8.dp)
-                    .background(Color.Transparent),
+                    .padding(start = 12.dp, top = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            LibraryChipType.entries.forEach { type ->
-                if ((type == LibraryChipType.YOUTUBE_MUSIC_PLAYLIST || type == LibraryChipType.YOUTUBE_MIX_FOR_YOU) && !loggedIn) {
-                    return@forEach
-                }
-                Chip(
-                    isAnimated = false,
-                    isSelected = type == currentFilter,
-                    text =
-                        when (type) {
-                            LibraryChipType.YOUR_LIBRARY -> stringResource(Res.string.your_library)
-                            LibraryChipType.YOUTUBE_MUSIC_PLAYLIST -> stringResource(Res.string.your_youtube_playlists)
-                            LibraryChipType.YOUTUBE_MIX_FOR_YOU -> stringResource(Res.string.mix_for_you)
-                            LibraryChipType.LOCAL_PLAYLIST -> stringResource(Res.string.your_playlists)
-                            LibraryChipType.FAVORITE_PLAYLIST -> stringResource(Res.string.favorite_playlists)
-                            LibraryChipType.DOWNLOADED_PLAYLIST -> stringResource(Res.string.downloaded_playlists)
-                            LibraryChipType.FAVORITE_PODCAST -> stringResource(Res.string.favorite_podcasts)
-                            LibraryChipType.CHART -> stringResource(Res.string.simpmusic_charts)
-                        },
+            if (backdrop != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .liquidGlass(backdrop, RoundedCornerShape(16.dp)),
                 ) {
-                    viewModel.setCurrentScreen(type)
+                    IconButton(
+                        onClick = { tagsExpanded = !tagsExpanded },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = if (tagsExpanded) "Collapse tags" else "Expand tags",
+                            tint = Color.White,
+                        )
+                    }
+                }
+            } else {
+                IconButton(
+                    onClick = { tagsExpanded = !tagsExpanded },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = if (tagsExpanded) "Collapse tags" else "Expand tags",
+                        tint = Color.White,
+                    )
+                }
+            }
+            if (tagsExpanded) {
+                Row(
+                    modifier =
+                        Modifier
+                            .padding(vertical = 8.dp, horizontal = 12.dp)
+                            .horizontalScroll(chipRowState),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    LibraryChipType.entries.forEach { type ->
+                        if ((type == LibraryChipType.YOUTUBE_MUSIC_PLAYLIST || type == LibraryChipType.YOUTUBE_MIX_FOR_YOU) && !loggedIn) {
+                            return@forEach
+                        }
+                        Chip(
+                            isAnimated = false,
+                            isSelected = type == currentFilter,
+                            text =
+                                when (type) {
+                                    LibraryChipType.YOUR_LIBRARY -> stringResource(Res.string.your_library)
+                                    LibraryChipType.YOUTUBE_MUSIC_PLAYLIST -> stringResource(Res.string.your_youtube_playlists)
+                                    LibraryChipType.YOUTUBE_MIX_FOR_YOU -> stringResource(Res.string.mix_for_you)
+                                    LibraryChipType.LOCAL_PLAYLIST -> stringResource(Res.string.your_playlists)
+                                    LibraryChipType.FAVORITE_PLAYLIST -> stringResource(Res.string.favorite_playlists)
+                                    LibraryChipType.DOWNLOADED_PLAYLIST -> stringResource(Res.string.downloaded_playlists)
+                                    LibraryChipType.FAVORITE_PODCAST -> stringResource(Res.string.favorite_podcasts)
+                                    LibraryChipType.CHART -> stringResource(Res.string.simpmusic_charts)
+                                },
+                            backdrop = backdrop,
+                            onClick = { viewModel.setCurrentScreen(type) },
+                        )
+                    }
                 }
             }
         }
+    }
     }
 }

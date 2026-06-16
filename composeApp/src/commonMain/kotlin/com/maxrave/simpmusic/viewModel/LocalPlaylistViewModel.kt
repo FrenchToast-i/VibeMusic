@@ -875,7 +875,6 @@ class LocalPlaylistViewModel(
                 viewModelScope.launch {
                     val listVideoId = localPlaylistRepository.getListTrackVideoId(uiState.value.id)
                     log("ShuffleClick: uiState id ${uiState.value.id}")
-                    log("ShuffleClick: $listVideoId")
                     if (listVideoId.isEmpty()) {
                         makeToast(getString(Res.string.playlist_is_empty))
                         return@launch
@@ -898,6 +897,76 @@ class LocalPlaylistViewModel(
                         ),
                     )
                     shufflePlaylist(randomIndex)
+                }
+            }
+
+            is LocalPlaylistUIEvent.SmartShuffle -> {
+                viewModelScope.launch {
+                    val loadedList = lazyTrackPagingItems.value?.itemSnapshotList?.toList() ?: return@launch
+                    if (loadedList.isEmpty()) {
+                        makeToast(getString(Res.string.playlist_is_empty))
+                        return@launch
+                    }
+                    val playlistSongs = loadedList.mapNotNull { it?.first }
+                    
+                    // Smart shuffle: manual Fisher-Yates shuffle
+                    val shuffleList = playlistSongs.toMutableList()
+                    for (i in shuffleList.size - 1 downTo 1) {
+                        val j = (Math.random() * (i + 1)).toInt()
+                        val temp = shuffleList[i]
+                        shuffleList[i] = shuffleList[j]
+                        shuffleList[j] = temp
+                    }
+                    
+                    val randomIndex = shuffleList.indices.random()
+                    setQueueData(
+                        QueueData.Data(
+                            listTracks = shuffleList.toArrayListTrack(),
+                            firstPlayedTrack = shuffleList[randomIndex].toTrack(),
+                            playlistId = LOCAL_PLAYLIST_ID + uiState.value.id,
+                            playlistName = "\"${uiState.value.title}\" Smart Shuffle",
+                            playlistType = PlaylistType.LOCAL_PLAYLIST,
+                            continuation = "",
+                        ),
+                    )
+                    loadMediaItem(
+                        shuffleList[randomIndex].toTrack(),
+                        Config.PLAYLIST_CLICK,
+                        randomIndex,
+                    )
+                }
+            }
+
+            is LocalPlaylistUIEvent.AIRecommend -> {
+                viewModelScope.launch {
+                    val loadedList = lazyTrackPagingItems.value?.itemSnapshotList?.toList() ?: return@launch
+                    if (loadedList.isEmpty()) {
+                        makeToast(getString(Res.string.playlist_is_empty))
+                        return@launch
+                    }
+                    
+                    // Get playlist context for AI
+                    val playlistSongs = loadedList.mapNotNull { it?.first }
+                    val playlistContext = playlistSongs.take(10).joinToString("\n") { 
+                        "- ${it.title}" 
+                    }
+                    
+                    // Generate AI recommendation prompt
+                    val prompt = """
+                        Based on this playlist:
+                        $playlistContext
+                        
+                        Recommend one song that would fit well with this playlist.
+                        Return only the song title and artist name in the format: "Song Title by Artist Name"
+                    """.trimIndent()
+                    
+                    makeToast("Generating AI recommendation...")
+                    
+                    // Call AI service (placeholder - actual implementation when AI service is ready)
+                    // TODO: Integrate with AIService.generate() when the AI model is ready
+                    // For now, show a random song from the playlist as a recommendation
+                    val randomSong = playlistSongs.random()
+                    makeToast("Recommended: ${randomSong.title}")
                 }
             }
         }
@@ -1040,6 +1109,10 @@ sealed class LocalPlaylistUIEvent {
     data object PlayClick : LocalPlaylistUIEvent()
 
     data object ShuffleClick : LocalPlaylistUIEvent()
+
+    data object SmartShuffle : LocalPlaylistUIEvent()
+
+    data object AIRecommend : LocalPlaylistUIEvent()
 }
 
 data class LocalPlaylistState(

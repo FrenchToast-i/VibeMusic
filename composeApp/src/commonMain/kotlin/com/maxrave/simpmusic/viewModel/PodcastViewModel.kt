@@ -293,7 +293,13 @@ class PodcastViewModel(
                     val index = kotlin.random.Random.nextInt(0, podcastData.listEpisode.size)
                     val shuffleList = podcastData.listEpisode.toMutableList()
                     val firstPlayItem = shuffleList.removeAt(index)
-                    shuffleList.shuffle()
+                    // Manual Fisher-Yates shuffle
+                    for (i in shuffleList.size - 1 downTo 1) {
+                        val j = (Math.random() * (i + 1)).toInt()
+                        val temp = shuffleList[i]
+                        shuffleList[i] = shuffleList[j]
+                        shuffleList[j] = temp
+                    }
                     shuffleList.add(0, firstPlayItem)
 
                     val queueData =
