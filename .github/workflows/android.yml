@@ -21,6 +21,9 @@ on:
       - '.github/FUNDING.yml'
       - '.github/ISSUE_TEMPLATE/**'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
