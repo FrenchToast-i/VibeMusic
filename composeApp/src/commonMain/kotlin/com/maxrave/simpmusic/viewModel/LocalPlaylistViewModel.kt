@@ -86,6 +86,7 @@ class LocalPlaylistViewModel(
 ) : BaseViewModel() {
     private val converter = Converters()
     private val downloadUtils: DownloadHandler by inject<DownloadHandler>()
+    private val lastFmService: com.maxrave.data.service.lastfm.LastFmService by inject()
 
     private var _offset: MutableStateFlow<Int> = MutableStateFlow(0)
     val offset: StateFlow<Int> = _offset
@@ -268,42 +269,145 @@ class LocalPlaylistViewModel(
         modifications.value += actions
     }
 
+    fun getAISuggestions(playlistId: Long) {
+        loading.value = true
+        viewModelScope.launch {
+            try {
+                // Get playlist tracks
+                val tracks = localPlaylistRepository.getFullPlaylistTracks(playlistId)
+                
+                if (tracks.isEmpty()) {
+                    loading.value = false
+                    makeToast("Playlist is empty")
+                    return@launch
+                }
+                
+                // Build prompt with playlist info
+                val trackNames = tracks.take(10).joinToString(", ") { 
+                    "${it.title} by ${it.artistName?.firstOrNull()}" 
+                }
+                
+                // Add Last.fm listening data if available
+                var lastFmData = ""
+                if (lastFmService.isLoggedIn()) {
+                    try {
+                        val topArtists = lastFmService.getTopArtists(null, 5, "7day").getOrNull()
+                        val topTracks = lastFmService.getTopTracks(null, 5, "7day").getOrNull()
+                        
+                        val artistNames = topArtists?.take(5)?.joinToString(", ") { it.name } ?: ""
+                        val trackNamesLastFm = topTracks?.take(5)?.joinToString(", ") { "${it.name} by ${it.artist}" } ?: ""
+                        
+                        if (artistNames.isNotEmpty() || trackNamesLastFm.isNotEmpty()) {
+                            lastFmData = """
+                                
+                                My recent listening history on Last.fm:
+                                Top artists: $artistNames
+                                Top tracks: $trackNamesLastFm
+                            """.trimIndent()
+                        }
+                    } catch (e: Exception) {
+                        Logger.w("LocalPlaylistViewModel", "Failed to fetch Last.fm data: ${e.message}")
+                    }
+                }
+                
+                val prompt = """
+                    Based on these songs in my playlist: $trackNames$lastFmData
+                    Suggest 5 similar songs that would fit well with this playlist.
+                    Return only the song titles and artists in this format: "Song Title - Artist Name"
+                    Separate each suggestion with a newline.
+                """.trimIndent()
+                
+                // Get AI settings
+                val aiProvider = dataStoreManager.aiProvider.first()
+                val apiKey = dataStoreManager.aiApiKey.first()
+                val customBaseUrl = dataStoreManager.customOpenAIBaseUrl.first()
+                
+                // Get AI recommendation
+                val recommendation = getAIRecommendation(prompt, aiProvider, apiKey, customBaseUrl)
+                
+                // Parse recommendations
+                val suggestions = recommendation.lines()
+                    .filter { it.contains("-") }
+                    .mapNotNull { line ->
+                        val parts = line.split(" - ", limit = 2)
+                        if (parts.size == 2) {
+                            Pair(parts[0].trim(), parts[1].trim())
+                        } else null
+                    }
+                
+                // Convert to Track format (placeholder - would need search API for real data)
+                val suggestedTracks = suggestions.mapIndexed { index, (title, artist) ->
+                    Track(
+                        videoId = "suggestion_$index",
+                        title = title,
+                        artists = listOf(com.maxrave.domain.data.model.searchResult.songs.Artist(id = "artist_$index", name = artist)),
+                        album = null,
+                        duration = "180000",
+                        durationSeconds = 180,
+                        isAvailable = true,
+                        isExplicit = false,
+                        likeStatus = "INDIFFERENT",
+                        thumbnails = null,
+                        videoType = "MUSIC_VIDEO_TYPE_OMV",
+                        category = null,
+                        feedbackTokens = null,
+                        resultType = null,
+                    )
+                }
+                
+                _uiState.update {
+                    it.copy(
+                        suggestions =
+                            LocalPlaylistState.SuggestionSongs(
+                                reloadParams = "ai_suggestions",
+                                songs = suggestedTracks,
+                            ),
+                    )
+                }
+                loading.value = false
+            } catch (e: Exception) {
+                Logger.e("LocalPlaylistViewModel", "AI suggestions failed", e)
+                loading.value = false
+                makeToast("Failed to get AI suggestions: ${e.message}")
+            }
+        }
+    }
+
     fun getSuggestions(playlistId: Long) {
         loading.value = true
         viewModelScope.launch {
-            localPlaylistRepository.getSuggestionsTrackForPlaylist(playlistId).collectLatestResource(
-                onSuccess = { res ->
-                    val reloadParams = res?.first
-                    val songs = res?.second
-                    if (reloadParams != null && songs != null) {
-                        _uiState.update {
-                            it.copy(
-                                suggestions =
-                                    LocalPlaylistState.SuggestionSongs(
-                                        reloadParams = reloadParams,
-                                        songs = songs,
-                                    ),
-                            )
+            val param = uiState.value.suggestions?.reloadParams
+            if (param != null) {
+                localPlaylistRepository.reloadSuggestionPlaylist(param).collectLatestResource(
+                    onSuccess = { res ->
+                        val reloadParams = res?.first
+                        val songs = res?.second
+                        if (reloadParams != null && songs != null) {
+                            _uiState.update {
+                                it.copy(
+                                    suggestions =
+                                        LocalPlaylistState.SuggestionSongs(
+                                            reloadParams = reloadParams,
+                                            songs = songs,
+                                        ),
+                                )
+                            }
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    suggestions = null,
+                                )
+                            }
                         }
-                    } else {
-                        _uiState.update {
-                            it.copy(
-                                suggestions = null,
-                            )
-                        }
-                    }
-                    loading.value = false
-                },
-                onError = { e ->
-                    makeToast(e)
-                    loading.value = false
-                    _uiState.update {
-                        it.copy(
-                            suggestions = null,
-                        )
-                    }
-                },
-            )
+                        loading.value = false
+                    },
+                    onError = {
+                        _uiState.update { it.copy(suggestions = null) }
+                        makeToast(getString(Res.string.error))
+                        loading.value = false
+                    },
+                )
+            }
         }
     }
 
@@ -963,9 +1067,14 @@ class LocalPlaylistViewModel(
                     
                     makeToast("Generating AI recommendation...")
                     
+                    // Get AI settings
+                    val aiProvider = dataStoreManager.aiProvider.first()
+                    val apiKey = dataStoreManager.aiApiKey.first()
+                    val customBaseUrl = dataStoreManager.customOpenAIBaseUrl.first()
+                    
                     // Try to use AI service if available
                     try {
-                        val recommendation = getAIRecommendation(prompt)
+                        val recommendation = getAIRecommendation(prompt, aiProvider, apiKey, customBaseUrl)
                         makeToast("Recommended: $recommendation")
                     } catch (e: Exception) {
                         // Fallback to random recommendation on error

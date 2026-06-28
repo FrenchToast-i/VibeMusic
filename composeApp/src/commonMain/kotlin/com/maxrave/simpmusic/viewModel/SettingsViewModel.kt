@@ -206,6 +206,33 @@ class SettingsViewModel(
     private val _lastFmEnabled = MutableStateFlow<Boolean>(false)
     val lastFmEnabled: StateFlow<Boolean> = _lastFmEnabled
 
+    private val _lastFmAuthUrl = MutableStateFlow<String>("")
+    val lastFmAuthUrl: StateFlow<String> = _lastFmAuthUrl
+
+    private val _lastFmAuthToken = MutableStateFlow<String>("")
+    val lastFmAuthToken: StateFlow<String> = _lastFmAuthToken
+
+    private val _lastFmLoginError = MutableStateFlow<String>("")
+    val lastFmLoginError: StateFlow<String> = _lastFmLoginError
+
+    private val _lastFmApiKey = MutableStateFlow<String>("")
+    val lastFmApiKey: StateFlow<String> = _lastFmApiKey
+
+    private val _lastFmApiSecret = MutableStateFlow<String>("")
+    val lastFmApiSecret: StateFlow<String> = _lastFmApiSecret
+
+    private val _lastFmScrobblingEnabled = MutableStateFlow<Boolean>(true)
+    val lastFmScrobblingEnabled: StateFlow<Boolean> = _lastFmScrobblingEnabled
+
+    private val _lastFmOfflineScrobblingEnabled = MutableStateFlow<Boolean>(true)
+    val lastFmOfflineScrobblingEnabled: StateFlow<Boolean> = _lastFmOfflineScrobblingEnabled
+
+    private val _lastFmScrobbleTimeThreshold = MutableStateFlow<Int>(60)
+    val lastFmScrobbleTimeThreshold: StateFlow<Int> = _lastFmScrobbleTimeThreshold
+
+    private val _lastFmScrobblePercentageThreshold = MutableStateFlow<Int>(50)
+    val lastFmScrobblePercentageThreshold: StateFlow<Int> = _lastFmScrobblePercentageThreshold
+
     private var _alertData: MutableStateFlow<SettingAlertState?> = MutableStateFlow(null)
     val alertData: StateFlow<SettingAlertState?> = _alertData
 
@@ -227,6 +254,10 @@ class SettingsViewModel(
         getYoutubeSubtitleLanguage()
         getHelpBuildLyricsDatabase()
         restoreLastFmSession()
+        getLastFmScrobblingEnabled()
+        getLastFmOfflineScrobblingEnabled()
+        getLastFmScrobbleTimeThreshold()
+        getLastFmScrobblePercentageThreshold()
         viewModelScope.launch {
             enableLiquidGlass.collect {
                 if (getPlatform() != Platform.Android && it) {
@@ -240,9 +271,17 @@ class SettingsViewModel(
         viewModelScope.launch {
             val sessionKey = dataStoreManager.lastFmSessionKey.first()
             val username = dataStoreManager.lastFmUsername.first()
+            val apiKey = dataStoreManager.lastFmApiKey.first()
+            val apiSecret = dataStoreManager.lastFmApiSecret.first()
             if (sessionKey.isNotEmpty() && username.isNotEmpty()) {
                 lastFmRepository.setSession(sessionKey, username)
                 Logger.d("SettingsViewModel", "Restored Last.fm session for user: $username")
+            }
+            if (apiKey.isNotEmpty() && apiSecret.isNotEmpty()) {
+                _lastFmApiKey.emit(apiKey)
+                _lastFmApiSecret.emit(apiSecret)
+                lastFmRepository.setCredentials(apiKey, apiSecret)
+                Logger.d("SettingsViewModel", "Restored Last.fm API credentials")
             }
         }
     }
@@ -1628,20 +1667,143 @@ class SettingsViewModel(
     }
 
     suspend fun authenticateLastFm() {
+        Logger.d("SettingsViewModel", "authenticateLastFm called")
         // Get auth token from Last.fm
         val tokenResult = lastFmRepository.authenticate()
         tokenResult.onSuccess { token ->
             Logger.d("SettingsViewModel", "Got auth token: $token")
-            // TODO: Open browser for user authorization
-            // For now, we'll need to implement a way to open the auth URL
             val authUrl = lastFmRepository.getAuthUrl(token)
             Logger.d("SettingsViewModel", "Auth URL: $authUrl")
-            
-            // After user authorizes, we'll need to get the session
-            // This requires a callback mechanism or deep link handling
-            // For now, this is a placeholder for the full OAuth flow
+            _lastFmAuthToken.emit(token)
+            _lastFmAuthUrl.emit(authUrl)
         }.onFailure { error ->
             Logger.e("SettingsViewModel", "Failed to get auth token", error)
+            _lastFmAuthUrl.emit("")
+        }
+    }
+
+    suspend fun completeLastFmLogin() {
+        val token = _lastFmAuthToken.value
+        Logger.d("SettingsViewModel", "completeLastFmLogin called, token: ${token.take(10)}...")
+        if (token.isEmpty()) {
+            Logger.e("SettingsViewModel", "No auth token available")
+            _lastFmLoginError.emit("No auth token available")
+            return
+        }
+        
+        // Poll for session completion (similar to pano-scrobbler)
+        var tryAgainTimeout = System.currentTimeMillis() + 120_000L // 2 minutes
+        Logger.d("SettingsViewModel", "Starting polling for session, timeout: $tryAgainTimeout")
+        
+        while (tryAgainTimeout > System.currentTimeMillis()) {
+            Logger.d("SettingsViewModel", "Polling for session...")
+            val sessionResult = lastFmRepository.getSession(token)
+            
+            sessionResult.onSuccess { session ->
+                Logger.d("SettingsViewModel", "Got session: ${session.name}")
+                dataStoreManager.setLastFmSessionKey(session.key)
+                dataStoreManager.setLastFmUsername(session.name)
+                lastFmRepository.setSession(session.key, session.name)
+                _lastFmSessionKey.emit(session.key)
+                _lastFmUsername.emit(session.name)
+                _lastFmAuthUrl.emit("")
+                _lastFmAuthToken.emit("")
+                _lastFmLoginError.emit("")
+                return
+            }.onFailure { error ->
+                Logger.e("SettingsViewModel", "Failed to get session: ${error.message}")
+                // Check if error is "token not authorized" (code 14)
+                val errorMessage = error.message ?: ""
+                if (errorMessage.contains("14") || errorMessage.contains("not been authorized") || 
+                    errorMessage.contains("UnknownHostException")) {
+                    // Token not yet authorized, wait and retry
+                    Logger.d("SettingsViewModel", "Token not authorized yet, waiting...")
+                    delay(5000)
+                    val hasTimeLeft = tryAgainTimeout - System.currentTimeMillis() > 0
+                    if (!hasTimeLeft) {
+                        Logger.e("SettingsViewModel", "Timeout waiting for authorization")
+                        _lastFmLoginError.emit("Timeout waiting for authorization. Please try again.")
+                    }
+                } else {
+                    // Other error, stop trying
+                    Logger.e("SettingsViewModel", "Other error, stopping polling: $errorMessage")
+                    _lastFmLoginError.emit(errorMessage)
+                    return
+                }
+            }
+        }
+        Logger.e("SettingsViewModel", "Polling loop ended without success")
+    }
+
+    suspend fun setLastFmApiKey(apiKey: String) {
+        dataStoreManager.setLastFmApiKey(apiKey)
+        _lastFmApiKey.emit(apiKey)
+    }
+
+    suspend fun setLastFmApiSecret(apiSecret: String) {
+        dataStoreManager.setLastFmApiSecret(apiSecret)
+        _lastFmApiSecret.emit(apiSecret)
+    }
+
+    suspend fun setLastFmCredentials(apiKey: String, apiSecret: String) {
+        Logger.d("SettingsViewModel", "setLastFmCredentials called with key: ${apiKey.take(10)}...")
+        dataStoreManager.setLastFmApiKey(apiKey)
+        dataStoreManager.setLastFmApiSecret(apiSecret)
+        _lastFmApiKey.emit(apiKey)
+        _lastFmApiSecret.emit(apiSecret)
+        lastFmRepository.setCredentials(apiKey, apiSecret)
+        Logger.d("SettingsViewModel", "Credentials set in repository")
+    }
+
+    fun getLastFmScrobblingEnabled() {
+        viewModelScope.launch {
+            _lastFmScrobblingEnabled.emit(dataStoreManager.lastFmScrobblingEnabled.first())
+        }
+    }
+
+    fun setLastFmScrobblingEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setLastFmScrobblingEnabled(enabled)
+            _lastFmScrobblingEnabled.emit(enabled)
+        }
+    }
+
+    fun getLastFmOfflineScrobblingEnabled() {
+        viewModelScope.launch {
+            _lastFmOfflineScrobblingEnabled.emit(dataStoreManager.lastFmOfflineScrobblingEnabled.first())
+        }
+    }
+
+    fun setLastFmOfflineScrobblingEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.setLastFmOfflineScrobblingEnabled(enabled)
+            _lastFmOfflineScrobblingEnabled.emit(enabled)
+        }
+    }
+
+    fun getLastFmScrobbleTimeThreshold() {
+        viewModelScope.launch {
+            _lastFmScrobbleTimeThreshold.emit(dataStoreManager.lastFmScrobbleTimeThreshold.first())
+        }
+    }
+
+    fun setLastFmScrobbleTimeThreshold(seconds: Int) {
+        viewModelScope.launch {
+            dataStoreManager.setLastFmScrobbleTimeThreshold(seconds)
+            _lastFmScrobbleTimeThreshold.emit(seconds)
+        }
+    }
+
+    fun getLastFmScrobblePercentageThreshold() {
+        viewModelScope.launch {
+            _lastFmScrobblePercentageThreshold.emit(dataStoreManager.lastFmScrobblePercentageThreshold.first())
+        }
+    }
+
+    fun setLastFmScrobblePercentageThreshold(percentage: Int) {
+        viewModelScope.launch {
+            dataStoreManager.setLastFmScrobblePercentageThreshold(percentage)
+            _lastFmScrobblePercentageThreshold.emit(percentage)
         }
     }
 }

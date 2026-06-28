@@ -30,6 +30,7 @@ import com.maxrave.simpmusic.viewModel.PlaylistUIState.Error
 import com.maxrave.simpmusic.viewModel.PlaylistUIState.Loading
 import com.maxrave.simpmusic.viewModel.PlaylistUIState.Success
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
+import com.maxrave.simpmusic.expect.getAIRecommendation
 import com.maxrave.simpmusic.extension.smartShuffle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,6 +39,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted.Companion.WhileSubscribed
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.singleOrNull
@@ -65,6 +67,7 @@ class PlaylistViewModel(
     private val playlistRepository: PlaylistRepository,
 ) : BaseViewModel() {
     val downloadUtils: DownloadHandler by inject<DownloadHandler>()
+    private val dataStoreManager: com.maxrave.domain.manager.DataStoreManager by inject()
     private var _uiState = MutableStateFlow<PlaylistUIState>(Loading)
     val uiState: StateFlow<PlaylistUIState> = _uiState
 
@@ -616,6 +619,43 @@ class PlaylistViewModel(
                 downloadFullPlaylist()
             }
 
+            PlaylistUIEvent.AIRecommend -> {
+                viewModelScope.launch {
+                    val loadedList = tracks.value
+                    if (loadedList.isEmpty()) {
+                        makeToast("Playlist is empty")
+                        return@launch
+                    }
+                    
+                    val playlistContext = loadedList.take(10).joinToString("\n") { 
+                        "- ${it.title}" 
+                    }
+                    
+                    val prompt = """
+                        Based on this playlist:
+                        $playlistContext
+                        
+                        Recommend one song that would fit well with this playlist.
+                        Return only the song title and artist name in the format: "Song Title by Artist Name"
+                    """.trimIndent()
+                    
+                    makeToast("Generating AI recommendation...")
+                    
+                    // Get AI settings
+                    val aiProvider = dataStoreManager.aiProvider.first()
+                    val apiKey = dataStoreManager.aiApiKey.first()
+                    val customBaseUrl = dataStoreManager.customOpenAIBaseUrl.first()
+                    
+                    try {
+                        val recommendation = getAIRecommendation(prompt, aiProvider, apiKey, customBaseUrl)
+                        makeToast("Recommended: $recommendation")
+                    } catch (e: Exception) {
+                        val randomSong = loadedList.random()
+                        makeToast("AI error: ${e.message}. Random recommendation: ${randomSong.title}")
+                    }
+                }
+            }
+
             PlaylistUIEvent.Favorite -> {
                 updatePlaylistLiked(!liked.value, data.id)
             }
@@ -779,6 +819,8 @@ sealed class PlaylistUIEvent {
     data object Favorite : PlaylistUIEvent()
 
     data object Download : PlaylistUIEvent()
+
+    data object AIRecommend : PlaylistUIEvent()
 }
 
 enum class ListState {

@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material.icons.rounded.ThumbDown
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -723,40 +724,21 @@ fun PlaylistScreen(
                                                     }
                                                 }
                                                 if (isMobilePortrait) {
-                                                    // Apple Music-style action row:
-                                                    // [Shuffle][Smart Shuffle][Play pill][Download/More] (cluster centered, all 48dp matching size)
+                                                    // Action row: Shuffle, AI Recommend, Play/Pause, Download
                                                     val isThisPlaying = isPlaying && playingPlaylistId == data.id
                                                     Row(
                                                         modifier =
                                                             Modifier
                                                                 .fillMaxWidth()
                                                                 .padding(vertical = 8.dp),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                                                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                                                         verticalAlignment = Alignment.CenterVertically,
                                                     ) {
                                                         if (!data.isRadio) {
                                                             Box(
                                                                 modifier =
                                                                     Modifier
-                                                                        .size(40.dp)
-                                                                        .clip(CircleShape)
-                                                                        .background(Color.White.copy(alpha = 0.12f))
-                                                                        .clickable {
-                                                                            viewModel.onUIEvent(PlaylistUIEvent.Shuffle)
-                                                                        },
-                                                                contentAlignment = Alignment.Center,
-                                                            ) {
-                                                                Icon(
-                                                                    imageVector = Icons.Rounded.Shuffle,
-                                                                    contentDescription = "Shuffle",
-                                                                    tint = Color.White,
-                                                                    modifier = Modifier.size(20.dp),
-                                                                )
-                                                            }
-                                                            Box(
-                                                                modifier =
-                                                                    Modifier
-                                                                        .size(40.dp)
+                                                                        .size(48.dp)
                                                                         .clip(CircleShape)
                                                                         .background(Color.White.copy(alpha = 0.12f))
                                                                         .clickable {
@@ -767,8 +749,26 @@ fun PlaylistScreen(
                                                                 Icon(
                                                                     painter = painterResource(Res.drawable.baseline_smart_shuffle_24),
                                                                     contentDescription = "Smart Shuffle",
-                                                                    tint = Color.White,
-                                                                    modifier = Modifier.size(20.dp),
+                                                                    tint = Color(0xFFD96570),
+                                                                    modifier = Modifier.size(22.dp),
+                                                                )
+                                                            }
+                                                            Box(
+                                                                modifier =
+                                                                    Modifier
+                                                                        .size(48.dp)
+                                                                        .clip(CircleShape)
+                                                                        .background(Color.White.copy(alpha = 0.12f))
+                                                                        .clickable {
+                                                                            viewModel.onUIEvent(PlaylistUIEvent.AIRecommend)
+                                                                        },
+                                                                contentAlignment = Alignment.Center,
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Rounded.AutoAwesome,
+                                                                    contentDescription = "AI Recommend",
+                                                                    tint = Color(0xFFD96570),
+                                                                    modifier = Modifier.size(22.dp),
                                                                 )
                                                             }
                                                         }

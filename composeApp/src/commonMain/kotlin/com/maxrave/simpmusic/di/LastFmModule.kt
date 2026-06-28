@@ -8,8 +8,8 @@ val lastFmModule =
         single {
             LastFmService(
                 httpClient = get(),
-                apiKey = com.maxrave.common.Config.LAST_FM_API_KEY,
-                apiSecret = com.maxrave.common.Config.LAST_FM_API_SECRET,
+                apiKey = "", // Will be set dynamically via SettingsViewModel
+                apiSecret = "", // Will be set dynamically via SettingsViewModel
             )
         }
     }

@@ -52,6 +52,8 @@ import androidx.compose.material.icons.automirrored.sharp.Sort
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.ThumbUp
+import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedButton
@@ -218,6 +220,8 @@ fun LocalPlaylistScreen(
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val enjoyedSongs by sharedViewModel.enjoyedSongs.collectAsStateWithLifecycle()
+    val dislikedSongs by sharedViewModel.dislikedSongs.collectAsStateWithLifecycle()
 
     val aiPainter = painterResource(Res.drawable.baseline_tips_and_updates_24)
     val limit = 1.5f
@@ -331,8 +335,8 @@ fun LocalPlaylistScreen(
     }
 
     LaunchedEffect(key1 = shouldShowSuggestions) {
-        if (suggestedTracks.isEmpty() && uiState.syncState != LocalPlaylistEntity.YouTubeSyncState.NotSynced) {
-            viewModel.getSuggestions(uiState.id)
+        if (suggestedTracks.isEmpty()) {
+            viewModel.getAISuggestions(uiState.id)
         }
     }
 
@@ -347,9 +351,7 @@ fun LocalPlaylistScreen(
         }
     }
     LaunchedEffect(key1 = uiState) {
-        shouldShowSuggestButton =
-            !uiState.ytPlaylistId.isNullOrEmpty() &&
-            uiState.syncState == LocalPlaylistEntity.YouTubeSyncState.Synced
+        shouldShowSuggestButton = true // Show for all playlists
     }
     LaunchedEffect(key1 = firstItemVisible) {
         shouldHideTopBar = !firstItemVisible
@@ -815,8 +817,7 @@ fun LocalPlaylistScreen(
                                     }
                                 }
                                 if (isMobilePortrait) {
-                                    // Apple Music-style action row: [Shuffle][Play pill][Download][Suggest]
-                                    // centered cluster. Suggest (AI) only shows when synced with YouTube.
+                                    // Action row: Shuffle, AI Recommend, Play/Pause, Download
                                     val isThisPlaying =
                                         isPlaying && playingPlaylistId == LOCAL_PLAYLIST_ID + uiState.id
                                     Row(
@@ -838,32 +839,14 @@ fun LocalPlaylistScreen(
                                                     .clip(CircleShape)
                                                     .background(Color.White.copy(alpha = 0.12f))
                                                     .clickable {
-                                                        viewModel.onUIEvent(LocalPlaylistUIEvent.ShuffleClick)
-                                                    },
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Shuffle,
-                                                contentDescription = "Shuffle",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(22.dp),
-                                            )
-                                        }
-                                        Box(
-                                            modifier =
-                                                Modifier
-                                                    .size(48.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color.White.copy(alpha = 0.12f))
-                                                    .clickable {
                                                         viewModel.onUIEvent(LocalPlaylistUIEvent.SmartShuffle)
                                                     },
                                             contentAlignment = Alignment.Center,
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Rounded.Shuffle,
+                                                painter = painterResource(Res.drawable.baseline_shuffle_24),
                                                 contentDescription = "Smart Shuffle",
-                                                tint = Color(0xFF4C82EF),
+                                                tint = Color(0xFFD96570),
                                                 modifier = Modifier.size(22.dp),
                                             )
                                         }
@@ -951,7 +934,6 @@ fun LocalPlaylistScreen(
                                                             )
                                                         }
                                                     }
-
                                                     DownloadState.STATE_DOWNLOADING -> {
                                                         Box(
                                                             modifier =
@@ -975,7 +957,6 @@ fun LocalPlaylistScreen(
                                                             )
                                                         }
                                                     }
-
                                                     else -> {
                                                         Box(
                                                             modifier =
@@ -1360,40 +1341,73 @@ fun LocalPlaylistScreen(
             val item = trackPagingItems[index]?.first
             if (item != null) {
                 val content = @Composable { mod: Modifier ->
-                    if (playingTrack?.videoId == item.videoId && isPlaying) {
-                        SongFullWidthItems(
-                            isPlaying = true,
-                            shouldShowDragHandle = changingOrder,
-                            songEntity = item,
-                            onMoreClickListener = { onItemMoreClick(it) },
-                            onClickListener = {
-                                Logger.w("PlaylistScreen", "index: $index")
-                                onPlaylistItemClick(it)
-                            },
-                            onAddToQueue = {
-                                sharedViewModel.addListToQueue(
-                                    arrayListOf(item.toTrack()),
-                                )
-                            },
-                            modifier = mod,
-                        )
-                    } else {
-                        SongFullWidthItems(
-                            isPlaying = false,
-                            shouldShowDragHandle = changingOrder,
-                            songEntity = item,
-                            onMoreClickListener = { onItemMoreClick(it) },
-                            onClickListener = {
-                                Logger.w("PlaylistScreen", "index: $index")
-                                onPlaylistItemClick(it)
-                            },
-                            onAddToQueue = {
-                                sharedViewModel.addListToQueue(
-                                    arrayListOf(item.toTrack()),
-                                )
-                            },
-                            modifier = mod,
-                        )
+                    Column(modifier = mod) {
+                        if (playingTrack?.videoId == item.videoId && isPlaying) {
+                            SongFullWidthItems(
+                                isPlaying = true,
+                                shouldShowDragHandle = changingOrder,
+                                songEntity = item,
+                                onMoreClickListener = { onItemMoreClick(it) },
+                                onClickListener = {
+                                    Logger.w("PlaylistScreen", "index: $index")
+                                    onPlaylistItemClick(it)
+                                },
+                                onAddToQueue = {
+                                    sharedViewModel.addListToQueue(
+                                        arrayListOf(item.toTrack()),
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            SongFullWidthItems(
+                                isPlaying = false,
+                                shouldShowDragHandle = changingOrder,
+                                songEntity = item,
+                                onMoreClickListener = { onItemMoreClick(it) },
+                                onClickListener = {
+                                    Logger.w("PlaylistScreen", "index: $index")
+                                    onPlaylistItemClick(it)
+                                },
+                                onAddToQueue = {
+                                    sharedViewModel.addListToQueue(
+                                        arrayListOf(item.toTrack()),
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        if (isMobilePortrait) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 72.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                IconButton(
+                                    onClick = { sharedViewModel.toggleEnjoy(item.videoId) },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ThumbUp,
+                                        contentDescription = "Enjoy",
+                                        tint = if (item.videoId in enjoyedSongs) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { sharedViewModel.toggleDislike(item.videoId) },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ThumbDown,
+                                        contentDescription = "Don't enjoy",
+                                        tint = if (item.videoId in dislikedSongs) Color(0xFFF44336) else Color.White.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 if (changingOrder) {

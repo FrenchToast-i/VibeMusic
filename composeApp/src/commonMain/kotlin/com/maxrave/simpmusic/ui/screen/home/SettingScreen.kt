@@ -1103,6 +1103,129 @@ fun SettingScreen(
                 )
             }
         }
+        item(key = "ai") {
+            Column {
+                Text(
+                    text = stringResource(Res.string.ai),
+                    style = typo().labelMedium,
+                    color = white,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+                SettingItem(
+                    title = stringResource(Res.string.ai_provider),
+                    subtitle =
+                        when (aiProvider) {
+                            DataStoreManager.AI_PROVIDER_GEMINI -> "Gemini"
+                            DataStoreManager.AI_PROVIDER_OPENAI -> "OpenAI"
+                            DataStoreManager.AI_PROVIDER_CUSTOM_OPENAI -> "Custom OpenAI"
+                            else -> stringResource(Res.string.unknown)
+                        },
+                    onClick = {
+                        viewModel.setAlertData(
+                            SettingAlertState(
+                                title = runBlocking { getString(Res.string.ai_provider) },
+                                selectOne =
+                                    SettingAlertState.SelectData(
+                                        listSelect =
+                                            listOf(
+                                                (aiProvider == DataStoreManager.AI_PROVIDER_GEMINI) to "Gemini",
+                                                (aiProvider == DataStoreManager.AI_PROVIDER_OPENAI) to "OpenAI",
+                                                (aiProvider == DataStoreManager.AI_PROVIDER_CUSTOM_OPENAI) to "Custom OpenAI",
+                                            ),
+                                    ),
+                                confirm =
+                                    runBlocking { getString(Res.string.change) } to { state ->
+                                        viewModel.setAIProvider(
+                                            when (state.selectOne?.getSelected()) {
+                                                "Gemini" -> DataStoreManager.AI_PROVIDER_GEMINI
+                                                "OpenAI" -> DataStoreManager.AI_PROVIDER_OPENAI
+                                                "Custom OpenAI" -> DataStoreManager.AI_PROVIDER_CUSTOM_OPENAI
+                                                else -> DataStoreManager.AI_PROVIDER_GEMINI
+                                            },
+                                        )
+                                    },
+                                dismiss = runBlocking { getString(Res.string.cancel) },
+                            ),
+                        )
+                    },
+                )
+                if (aiProvider == DataStoreManager.AI_PROVIDER_GEMINI || aiProvider == DataStoreManager.AI_PROVIDER_OPENAI || aiProvider == DataStoreManager.AI_PROVIDER_CUSTOM_OPENAI) {
+                    SettingItem(
+                        title = stringResource(Res.string.ai_api_key),
+                        subtitle = if (isHasApiKey) "API key set" else "No API key",
+                        onClick = {
+                            viewModel.setAlertData(
+                                SettingAlertState(
+                                    title = runBlocking { getString(Res.string.ai_api_key) },
+                                    textField =
+                                        SettingAlertState.TextFieldData(
+                                            label = runBlocking { getString(Res.string.ai_api_key) },
+                                            value = "",
+                                        ),
+                                    message = "Enter your API key",
+                                    confirm =
+                                        runBlocking { getString(Res.string.save) } to { state ->
+                                            viewModel.setAIApiKey(state.textField?.value ?: "")
+                                        },
+                                    dismiss = runBlocking { getString(Res.string.cancel) },
+                                ),
+                            )
+                        },
+                    )
+                }
+                if (aiProvider == DataStoreManager.AI_PROVIDER_OPENAI || aiProvider == DataStoreManager.AI_PROVIDER_CUSTOM_OPENAI) {
+                    SettingItem(
+                        title = stringResource(Res.string.openai_api_compatible),
+                        subtitle = "Use custom OpenAI-compatible API",
+                        onClick = {
+                            viewModel.setAlertData(
+                                SettingAlertState(
+                                    title = "Custom OpenAI Base URL",
+                                    textField =
+                                        SettingAlertState.TextFieldData(
+                                            label = "Base URL",
+                                            value = customOpenAIBaseUrl ?: "",
+                                        ),
+                                    message = "Enter custom OpenAI-compatible API base URL",
+                                    confirm =
+                                        runBlocking { getString(Res.string.save) } to { state ->
+                                            viewModel.setCustomOpenAIBaseUrl(state.textField?.value ?: "")
+                                        },
+                                    dismiss = runBlocking { getString(Res.string.cancel) },
+                                ),
+                            )
+                        },
+                    )
+                    SettingItem(
+                        title = "Custom Headers",
+                        subtitle = "Additional headers for API requests",
+                        onClick = {
+                            viewModel.setAlertData(
+                                SettingAlertState(
+                                    title = "Custom Headers",
+                                    textField =
+                                        SettingAlertState.TextFieldData(
+                                            label = "Headers (JSON)",
+                                            value = customOpenAIHeaders ?: "",
+                                        ),
+                                    message = "Enter additional headers as JSON",
+                                    confirm =
+                                        runBlocking { getString(Res.string.save) } to { state ->
+                                            viewModel.setCustomOpenAIHeaders(state.textField?.value ?: "")
+                                        },
+                                    dismiss = runBlocking { getString(Res.string.cancel) },
+                                ),
+                            )
+                        },
+                    )
+                }
+                SettingItem(
+                    title = stringResource(Res.string.use_ai_translation),
+                    subtitle = stringResource(Res.string.use_ai_translation_description),
+                    switch = (useAITranslation to { viewModel.setAITranslation(it) }),
+                )
+            }
+        }
         item(key = "lastfm") {
             Column {
                 Text(
@@ -1111,13 +1234,116 @@ fun SettingScreen(
                     color = white,
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
-                SettingItem(
-                    title = "Log in to Last.fm",
-                    subtitle = "Scrobble your music to Last.fm",
-                    onClick = {
-                        navController.navigate(LastFmLoginDestination)
-                    },
-                )
+                val lastFmSessionKey by viewModel.lastFmSessionKey.collectAsStateWithLifecycle()
+                val lastFmUsername by viewModel.lastFmUsername.collectAsStateWithLifecycle()
+                val lastFmScrobblingEnabled by viewModel.lastFmScrobblingEnabled.collectAsStateWithLifecycle()
+                val lastFmOfflineScrobblingEnabled by viewModel.lastFmOfflineScrobblingEnabled.collectAsStateWithLifecycle()
+                val lastFmScrobbleTimeThreshold by viewModel.lastFmScrobbleTimeThreshold.collectAsStateWithLifecycle()
+                val lastFmScrobblePercentageThreshold by viewModel.lastFmScrobblePercentageThreshold.collectAsStateWithLifecycle()
+                
+                if (lastFmSessionKey.isNotEmpty()) {
+                    // Logged in state
+                    SettingItem(
+                        title = "Logged in as $lastFmUsername",
+                        subtitle = "Scrobbling enabled",
+                        onClick = {},
+                    )
+                    SettingItem(
+                        title = "Scrobbling",
+                        subtitle = "Scrobble your music to Last.fm",
+                        switch = (lastFmScrobblingEnabled to { viewModel.setLastFmScrobblingEnabled(it) }),
+                    )
+                    SettingItem(
+                        title = "Offline Scrobbling",
+                        subtitle = "Cache scrobbles when offline and upload later",
+                        switch = (lastFmOfflineScrobblingEnabled to { viewModel.setLastFmOfflineScrobblingEnabled(it) }),
+                    )
+                    SettingItem(
+                        title = "Scrobble Time Threshold",
+                        subtitle = "${lastFmScrobbleTimeThreshold}s minimum before scrobbling",
+                        onClick = {
+                            viewModel.setAlertData(
+                                SettingAlertState(
+                                    title = "Scrobble Time Threshold",
+                                    selectOne =
+                                        SettingAlertState.SelectData(
+                                            listSelect =
+                                                listOf(
+                                                    (lastFmScrobbleTimeThreshold == 30) to "30s",
+                                                    (lastFmScrobbleTimeThreshold == 60) to "60s",
+                                                    (lastFmScrobbleTimeThreshold == 90) to "90s",
+                                                    (lastFmScrobbleTimeThreshold == 120) to "120s",
+                                                    (lastFmScrobbleTimeThreshold == 180) to "180s",
+                                                    (lastFmScrobbleTimeThreshold == 240) to "240s",
+                                                ),
+                                        ),
+                                    confirm =
+                                        "Change" to { state ->
+                                            val time = when (state.selectOne?.getSelected()) {
+                                                "30s" -> 30
+                                                "60s" -> 60
+                                                "90s" -> 90
+                                                "120s" -> 120
+                                                "180s" -> 180
+                                                "240s" -> 240
+                                                else -> 60
+                                            }
+                                            viewModel.setLastFmScrobbleTimeThreshold(time)
+                                        },
+                                    dismiss = "Cancel",
+                                ),
+                            )
+                        },
+                    )
+                    SettingItem(
+                        title = "Scrobble Percentage Threshold",
+                        subtitle = "${lastFmScrobblePercentageThreshold}% of track minimum before scrobbling",
+                        onClick = {
+                            viewModel.setAlertData(
+                                SettingAlertState(
+                                    title = "Scrobble Percentage Threshold",
+                                    selectOne =
+                                        SettingAlertState.SelectData(
+                                            listSelect =
+                                                listOf(
+                                                    (lastFmScrobblePercentageThreshold == 25) to "25%",
+                                                    (lastFmScrobblePercentageThreshold == 50) to "50%",
+                                                    (lastFmScrobblePercentageThreshold == 75) to "75%",
+                                                ),
+                                        ),
+                                    confirm =
+                                        "Change" to { state ->
+                                            val percentage = when (state.selectOne?.getSelected()) {
+                                                "25%" -> 25
+                                                "50%" -> 50
+                                                "75%" -> 75
+                                                else -> 50
+                                            }
+                                            viewModel.setLastFmScrobblePercentageThreshold(percentage)
+                                        },
+                                    dismiss = "Cancel",
+                                ),
+                            )
+                        },
+                    )
+                    SettingItem(
+                        title = "Log out",
+                        subtitle = "Sign out from Last.fm",
+                        onClick = {
+                            viewModel.setLastFmEnabled(false)
+                            viewModel.makeToast("Logged out from Last.fm")
+                        },
+                    )
+                } else {
+                    // Logged out state
+                    SettingItem(
+                        title = "Log in to Last.fm",
+                        subtitle = "Scrobble your music to Last.fm",
+                        onClick = {
+                            navController.navigate(LastFmLoginDestination)
+                        },
+                    )
+                }
             }
         }
         item(key = "sponsor_block") {
